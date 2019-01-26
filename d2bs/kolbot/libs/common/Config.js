@@ -392,6 +392,9 @@ var Config = {
 		KillBaal: false,
 		SkipTP: false
 	},
+	SpeedBaal: {
+		Follower: false,
+	},
 	Corpsefire: {
 		ClearDen: false
 	},

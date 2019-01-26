@@ -120,6 +120,10 @@ function LoadConfig() {
 		Config.Baal.DollQuit = false; // End script if Dolls (Undead Stigyan Dolls) are found.
 		Config.Baal.KillBaal = true; // Kill Baal. Leaves game after wave 5 if false.
 
+	// Optimized baalscript for fast baalruns. Not an mf script.
+	Scripts.SpeedBaal = false;
+		Config.SpeedBaal.Follower = false; // Set on true if it needs to take the portal to throne, false if it needs to teleport on it's own
+
 	/* ### leeching section ###
 	* Unless stated otherwise, leader's character name isn't needed on order to run.
 	* Don't use more scripts of the same type! (Run AutoBaal OR BaalHelper, not both)

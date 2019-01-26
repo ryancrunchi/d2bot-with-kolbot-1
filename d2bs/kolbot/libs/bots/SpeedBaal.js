@@ -5,12 +5,45 @@
  *
  * Some highlights
  * 1) Faster clearing of the throne by only killing the necessary monsters for a wave to spawn
- * 2) Lighting / Blizzard / Meteor / Hammers / Fury, and many more skills are cast just on time before wave comes. To save mana, but also to have maximum impact
+ * 2) Lightning / Blizzard / Meteor / Hammers / Fury, and many more skills are cast just on time before wave comes. To save mana, but also to have maximum impact
  * 3) Added some custom pickit lines to avoid NPC interactions, to make runs go faster. (again this isn't an mf run, its an xp run)
  * 4) Overrides Attack.clear function to be quicker better for the throne, but don't worry after the script is done (or crashed), it puts the original clear script back.
  */
 
+let mainchar, BaalPartyPeople, Nihla, DiabloClearer, DiabloKill, skipBaalIfCharInGame, skipBaalWho, ShrineSearcher,
+	Shriner;
+
+switch (true) {
+
+	// Change (GameName) to whatever run your running
+	case /(GameName)-?\d{1,3}/i.test(me.gamename): // If regex matches
+		mainchar = 'YourMainChar';
+
+		BaalPartyPeople = [];
+
+		// Who kills nihla?
+		Nihla = 'YourMainChar';
+
+		DiabloClearer = 'SomeHelperChar'; // char(in game name) that clears diablo, making it ready for the high lvl
+		DiabloKill = 'YourMainChar'; // char(in game name) that kills diablo
+
+		// Who skips baal, can be multiple chars
+		skipBaalWho = ['SomePassiveLeechers'];
+
+		// Who search for a shrine, who gets a shrine?
+		ShrineSearcher = 'SomeHelperChar'; // Must be diffrent as DiabloClear
+		Shriner = 'YourMainChar';
+		break;
+
+	// If you run multiple games
+	case /(OtherGame)-?\d{1,3}/i.test(me.gamename): // If regex matches
+		break;
+}
+
+
 function SpeedBaal() {
+	var justPortaledTick = 0;
+
 	// Debug function
 	function debug(what) {
 		var stackNumber = 1, // exclude this function
@@ -27,10 +60,10 @@ function SpeedBaal() {
 		}
 		switch (true) {
 			case self.endsWith('default.dbj'):
-				print('\xFFc:[\xFFc5' + filename + '\xFFc:] (\xFFc:' + functionName + ':' + line + '\xFFc:):\xFFc0 ' + what);
+				print('ÿc:[ÿc5' + filename + 'ÿc:] (ÿc:' + functionName + ':' + line + 'ÿc:):ÿc0 ' + what);
 				break;
 			case self.endsWith(getCurrentFileName().substr(0, getCurrentFileName().indexOf(':'))):
-				print('\xFFc:[\xFFc5Thread\xFFc:] (\xFFc:' + functionName + ':' + line + '\xFFc:):\xFFc0 ' + what);
+				print('ÿc:[ÿc5Threadÿc:] (ÿc:' + functionName + ':' + line + 'ÿc:):ÿc0 ' + what);
 		}
 	}
 
@@ -45,7 +78,7 @@ function SpeedBaal() {
 				line: i + 1,
 				file: '',
 				string: line
-			}
+			};
 		line = NTIP.ParseLineInt(line, info);
 		if (line) {
 
@@ -65,7 +98,7 @@ function SpeedBaal() {
 				delay(250);
 				load('libs/bots/' + filename); // Load our selfs
 				return false; // did start the thread, but we aren't the thread
-			case self.endsWith(filename):
+			case self.endsWith(filename): // got loaded
 				include("common/Config.js");
 				include("common/Storage.js");
 				include("common/Pather.js");
@@ -78,35 +111,306 @@ function SpeedBaal() {
 		return true;
 	}
 
+	function togglePartyScript(to) {
+		var script = getScript("tools/Party.js");
+		if (!script || script.running === to) {
+			return false; // Party script not found, or already on/off
+		}
+		return to ? script.resume() : script.pause();
+	}
+
 	var Thread = {
 		vault: {
 			tick: 0,
 			oldtick: 0,
-			packetListenerOn: false
+			packetListenerOn: false,
+			baalpartyLeft: false,
+			baalpartyJoined: false,
+			diabloDone: false,
+			diabloUp: false,
+			diabloCreating: false,
+			shrineCreating: false,
+			shrineUp: false,
+			partyScriptRunning: true,
+			gameStart: getTickCount(),
 		},
 		checks: {
+			// Baalparty crap
+			baalpartyLeave: function () {
+
+				if (Thread.vault.baalpartyLeft || Thread.vault.baalpartyJoined) {
+					return true;
+				}
+
+				// Stop party script if running longer as 60 seconds
+				if (me.area === Areas.ThroneOfDestruction && Thread.vault.partyScriptRunning && getTickCount() - Thread.vault.gameStart > 60e3) {
+					Thread.vault.partyScriptRunning = false;
+					debug('stopping party script');
+					togglePartyScript(false); // stop partying
+				}
+				// In case it doesnt need to be ran
+				if (BaalPartyPeople.indexOf(me.name) === -1 || Thread.vault.baalpartyLeft || me.area !== Areas.WorldstoneChamber) {
+					return true;
+				}
+				//ToDo: make this check in throne, take in account the distance of the throne entrance
+
+
+				try {
+					togglePartyScript(false); // put party script off
+					let party = getParty();
+					if (party) {
+						clickParty(party, 3); // leave current party
+					}
+					delay(me.ping * 3 + rand(0, 1500)); // wait a bit
+					Thread.vault.baalpartyLeft = true;
+					if (me.name === mainchar) {
+						togglePartyScript(true);
+					}
+					debug('left party to later join baalparty');
+				} catch (e) {
+					// nothing, retry next time
+				}
+				return true;
+			},
+			baalpartyJoin: function () {
+				if (!Thread.vault.baalpartyLeft || Thread.vault.baalpartyJoined) {
+					return true; // Not left yet, so can join
+				}
+
+				if (this.hasOwnProperty('baalpartyLeave')) {
+					delete this['baalpartyLeave'];
+				}
+
+				// ToDo: Stole some from party script here. need to write my own but for now its fine
+				var myPartyId, player, otherParty;
+				player = getParty();
+
+				if (player) {
+					while (player.getNext()) {
+						switch (Config.PublicMode) {
+							case 1: // Invite others, and accept
+							case 3: // Invite others but never accept
+
+								// Ingore hostiled players
+								if (getPlayerFlag(me.gid, player.gid, 8)) {
+									break;
+								}
+
+								// Inivite others that aren't partied in the first place
+								if (BaalPartyPeople.indexOf(player.name) !== -1				// Only people in the list
+									&& player.partyflag !== 4  								// If not already invited
+									&& (Config.PublicMode === 1 || player.partyflag !== 2)  // Only accept if we want to accept
+									&& player.partyid === 65535) {							// If not in a party (or party 65535 aka last party)
+
+									if (me.name !== mainchar) {
+										clickParty(player, 2);
+									}
+									delay(100);
+								}
+
+								break;
+							case 2: // Accept invites
+								debug('Accept party of ' + player.name + '?');
+								debug('BaalPartyPeople.indexOf(player.name): ' + BaalPartyPeople.indexOf(player.name));
+								debug(' player.partyflag === 2: ' + player.partyflag === 2);
+								debug('Other party? ' + (!otherParty || player.partyid === otherParty));
+								if (BaalPartyPeople.indexOf(player.name) !== -1 	  // Only people in baalpartypeople
+									&& player.partyflag === 2 						  // That are inviting me
+								) {
+									clickParty(player, 2);
+									Thread.vault.baalpartyJoined = true; // no need to keep checking this now
+									delay(100);
+								}
+								break;
+						}
+					}
+				}
+				return true;
+
+			},
+
+			// Check if dia is being setup
+			DiaCreating: function () {
+				if (Thread.vault.diabloCreating) {
+					return true;
+				}
+
+				let party, readable = false;
+				party = getParty();
+
+				if (party) {
+					do {
+						if (party.name !== me.name && party.area) {
+							readable = true; // Can read player area
+						}
+					} while (party.getNext());
+				}
+
+				if (!readable) {
+					return true; // cant read party area info yet
+				}
+				party = getParty();
+
+				if (party) {
+					do {
+						if (party.name === DiabloClearer && party.area === Areas.ChaosSanctuary) {
+							debug('Diablo is being created atm');
+							// Player is in throne so we can assume diablo is up
+							Thread.vault.diabloCreating = true;
+						}
+					} while (party.getNext());
+				}
+				return true;
+			},
+			DiaReady: function () {
+
+				// If this check is done, dont check it
+				if (!Thread.vault.diabloCreating || Thread.vault.diabloUp || DiabloKill !== me.name) {
+					return true;
+				}
+
+				if (this.hasOwnProperty('DiaCreating')) {
+					delete this['DiaCreating'];
+				}
+
+				let party, readable = false;
+				party = getParty();
+
+				if (party) {
+					do {
+						if (party.name !== me.name && party.area) {
+							readable = true; // Can read player area
+						}
+					} while (party.getNext());
+				}
+
+				if (!readable) {
+					return true; // cant read party area info yet
+				}
+
+
+				party = getParty();
+
+				if (party) {
+					do {
+						if (party.name === DiabloClearer && party.area === Areas.ThroneOfDestruction) {
+							debug('Diablo should be up now');
+							// Player is in throne so we can assume diablo is up
+							Thread.vault.diabloUp = true;
+
+							removeEventListener('gamepacket', Thread.events.gamePacket); // disable it a second
+							delay(500); // Do this or get massive lag spikes! (weird buggy stuff of d2bs)
+							Communication.setVariable('diabloUp', true);
+							delay(500);
+							addEventListener('gamepacket', Thread.events.gamePacket); // enable it
+						}
+					} while (party.getNext());
+				}
+				return true;
+			},
+
+			ShrineCreating: function () {
+				if (Thread.vault.shrineCreating || Shriner !== me.name) {
+					return true;
+				}
+
+				let party, readable = false;
+				party = getParty();
+
+				if (party) {
+					do {
+						if (party.name !== me.name && party.area) {
+							readable = true; // Can read player area
+						}
+					} while (party.getNext());
+				}
+
+				if (!readable) {
+					return true; // cant read party area info yet
+				}
+				party = getParty();
+
+				if (party) {
+					do {
+						if (party.name === ShrineSearcher && [Areas.ColdPlains, Areas.StonyField, Areas.DarkWood, Areas.BlackMarsh, Areas.JailLvl2, Areas.CatacombsLvl2].indexOf(party.area) !== -1) {
+							debug('Shrine is being searched');
+							// Player is in throne so we can assume diablo is up
+							Thread.vault.shrineCreating = true;
+						}
+					} while (party.getNext());
+				}
+				return true;
+			},
+			ShrineReady: function () {
+
+				// If this check is done, dont check it
+				if (!Thread.vault.shrineCreating || Thread.vault.shrineUp || Shriner !== me.name) {
+					return true;
+				}
+
+				if (this.hasOwnProperty('ShrineCreating')) {
+					delete this['ShrineCreatingr'];
+				}
+
+				let party, readable = false;
+				party = getParty();
+
+				if (party) {
+					do {
+						if (party.name !== me.name && party.area) {
+							readable = true; // Can read player area
+						}
+					} while (party.getNext());
+				}
+
+				if (!readable) {
+					return true; // cant read party area info yet
+				}
+
+				party = getParty();
+
+				if (party) {
+					do {
+						if (party.name === ShrineSearcher && party.area === Areas.ThroneOfDestruction) {
+							debug('Shrine should be up now');
+							// Player is in throne so we can assume shrine is up
+							Thread.vault.shrineUp = true;
+
+							removeEventListener('gamepacket', Thread.events.gamePacket); // disable it a second
+							delay(500); // Do this or get massive lag spikes! (weird buggy stuff of d2bs)
+							Communication.setVariable('shrineUp', true);
+							delay(500);
+							addEventListener('gamepacket', Thread.events.gamePacket); // enable it
+						}
+					} while (party.getNext());
+				}
+				return true;
+			},
+
+			// Baal wave sign
 			tickUpdate: function () {
 				if (Thread.vault.tick !== Thread.vault.oldtick) {
 					removeEventListener('gamepacket', Thread.events.gamePacket); // disable it a second
 					debug('Throne ready for wave. Will spawn in 12 seconds');
 					delay(500); // Do this or get massive lag spikes! (weird buggy stuff of d2bs)
 					Communication.setVariable('tick', Thread.vault.tick);
+					delay(500);
 					addEventListener('gamepacket', Thread.events.gamePacket); // enable it
 					Thread.vault.oldtick = Thread.vault.tick;
 				}
 
-				// In throne and packet listner is off?
+				// In throne and packet listener is off?
 				if (!Thread.vault.packetListenerOn && me.area === Areas.ThroneOfDestruction) {
 					addEventListener('gamepacket', Thread.events.gamePacket);
 					Thread.vault.packetListenerOn = true;
 				}
 
-				// Not in throne but packet listner on?
+				// Not in throne but packet listener on?
 				if (Thread.vault.packetListenerOn && me.area !== Areas.ThroneOfDestruction) {
 					removeEventListener('gamepacket', Thread.events.gamePacket);
 					Thread.vault.packetListenerOn = false;
 				}
-			}
+			},
 		},
 		events: {
 			gamePacket: function (bytes) {
@@ -134,6 +438,7 @@ function SpeedBaal() {
 					if (this.checks.hasOwnProperty(i) && typeof this.checks[i] === "function" && i !== "go") {
 						this.checks[i]();
 					}
+					delay(200);
 				}
 			}
 		}
@@ -408,10 +713,215 @@ function SpeedBaal() {
 			MartialArts: 50,
 		}
 	};
+	var States = {
+		None: 0,
+		Freeze: 1,
+		Posion: 2,
+		ResistFire: 3,
+		ResistCold: 4,
+		ResistLightning: 5,
+		ResistMagic: 6,
+		PlayerBody: 7,
+		ResistAll: 8,
+		AmplifyDamage: 9,
+		FrozenArmor: 10,
+		Cold: 11,
+		Inferno: 12,
+		Blaze: 13,
+		BoneArmor: 14,
+		Concentrate: 15,
+		Enchant: 16,
+		InnerSight: 17,
+		SkillMove: 18,
+		Weaken: 19,
+		ChillingArmor: 20,
+		Stunned: 21,
+		SpiderLay: 22,
+		DimVision: 23,
+		Slowed: 24,
+		FetishAura: 25,
+		Shout: 26,
+		Taunt: 27,
+		Conviction: 28,
+		Convicted: 29,
+		EnergyShield: 30,
+		VenomClaws: 31,
+		BattleOrders: 32,
+		Might: 33,
+		Prayer: 34,
+		HolyFire: 35,
+		Thorns: 36,
+		Defiance: 37,
+		ThunderStorm: 38,
+		LightningBolt: 39,
+		BlessedAim: 40,
+		Stamina: 41,
+		Concentration: 42,
+		Holywind: 43,
+		HolywindCold: 44,
+		Cleansing: 45,
+		HolyShock: 46,
+		Sanctuary: 47,
+		Meditation: 48,
+		Fanaticism: 49,
+		Redemption: 50,
+		BattleCommand: 51,
+		PreventHeal: 52,
+		Conversion: 53,
+		Uninterruptable: 54,
+		IronMaiden: 55,
+		Terror: 56,
+		Attract: 57,
+		LifeTap: 58,
+		Confuse: 59,
+		Decrepify: 60,
+		LowerResist: 61,
+		OpenWounds: 62,
+		Dopplezon: 63,
+		CriticalStrike: 64,
+		Dodge: 65,
+		Avoid: 66,
+		Penetrate: 67,
+		Evade: 68,
+		Pierce: 69,
+		Warmth: 70,
+		FireMastery: 71,
+		LightningMastery: 72,
+		ColdMastery: 73,
+		SwordMastery: 74,
+		AxeMastery: 75,
+		MaceMastery: 76,
+		PoleArmMastery: 77,
+		ThrowingMastery: 78,
+		SpearMastery: 79,
+		IncreasedStamina: 80,
+		IronSkin: 81,
+		IncreasedSpeed: 82,
+		NaturalResistance: 83,
+		FingerMageCurse: 84,
+		NoManaReg: 85,
+		JustHit: 86,
+		SlowMissiles: 87,
+		ShiverArmor: 88,
+		BattleCry: 89,
+		Blue: 90,
+		Red: 91,
+		DeathDelay: 92,
+		Valkyrie: 93,
+		Frenzy: 94,
+		Berserk: 95,
+		Revive: 96,
+		ItemFullSet: 97,
+		SourceUnit: 98,
+		Redeemed: 99,
+		Healthpot: 100,
+		HolyShield: 101,
+		JustPortaled: 102,
+		MonFrenzy: 103,
+		CorpseNoDraw: 104,
+		Alignment: 105,
+		Manapot: 106,
+		Shatter: 107,
+		SyncWarped: 108,
+		ConversionSave: 109,
+		Pregnat: 110,
+		Rabies: 112,
+		DefenceCurse: 113,
+		BloodMana: 114,
+		Burning: 115,
+		DragonFlight: 116,
+		Maul: 117,
+		CorpseNoSelect: 118,
+		ShadowWarrior: 119,
+		FeralRage: 120,
+		SkillDelay: 121,
+		ProgressiveDamage: 122,
+		ProgressiveSteal: 123,
+		ProgressiveOther: 124,
+		ProgressiveFire: 125,
+		ProgressiveCold: 126,
+		ProgressiveLighting: 127,
+		ShrineArmor: 128,
+		ShrineCombat: 129,
+		ShrineResLighting: 130,
+		ShrineResFire: 131,
+		ShrineResCold: 132,
+		ShrineResPoison: 133,
+		ShrineSkill: 134,
+		ShrineManaRegen: 135,
+		ShrineStamina: 136,
+		ShrineExperience: 137,
+		FenrisRage: 138,
+		Wolf: 139,
+		Bear: 140,
+		Bloodlust: 141,
+		ChangeClass: 142,
+		Attached: 143,
+		Hurricane: 144,
+		Armageddon: 145,
+		Invis: 146,
+		Barbs: 147,
+		HeartofWolverine: 148,
+		OakSage: 149,
+		VineBeast: 150,
+		CycloneArmor: 151,
+		ClawMastery: 152,
+		CloakofShadows: 153,
+		Recyled: 154,
+		WeaponBlock: 155,
+		Cloaked: 156,
+		Quickness: 157,
+		BladeShield: 158,
+		Fade: 159,
+	};
 	var Areas = {
+		// act 1
+		RogueEncampment: 1,
+		BloodMoor: 2,
+		ColdPlains: 3,
+		StonyField: 4,
+		DarkWood: 5,
+		BlackMarsh: 6,
+		TamoeHighland: 7,
+		DenOfEvil: 8,
+		CaveLvl1: 9,
+		UndergroundPassageLvl1: 10,
+		HoleLvl1: 11,
+		PitLvl1: 12,
+		CaveLvl2: 13,
+		UndergroundPassageLvl2: 14,
+		HoleLvl2: 15,
+		PitLvl2: 16,
+		BurialGrounds: 17,
+		Crypt: 18,
+		Mausoleum: 19,
+		ForgottenTower: 20,
+		TowerCellarLvl1: 21,
+		TowerCellarLvl2: 22,
+		TowerCellarLvl3: 23,
+		TowerCellarLvl4: 24,
+		TowerCellarLvl5: 25,
+		MonasteryGate: 26,
+		OuterCloister: 27,
+		Barracks: 28,
+		JailLvl1: 29,
+		JailLvl2: 30,
+		JailLvl3: 31,
+		InnerCloister: 32,
+		Cadral: 33,
+		CatacombsLvl1: 34,
+		CatacombsLvl2: 35,
+		CatacombsLvl3: 36,
+		CatacombsLvl4: 37,
+		Tristram: 38,
+		MooMooFarm: 39,
 
+		// Act 4
+		PandemoniumFortress: 103,
+		ChaosSanctuary: 108,
+
+		// act 5
 		Harrogath: 109,
-
 		WorldstoneLvl2: 129,
 		WorldstoneLvl3: 130,
 		ThroneOfDestruction: 131,
@@ -423,7 +933,7 @@ function SpeedBaal() {
 		Javazon: 1,
 		FireBall: 2,
 		Blizzard: 3,
-		Lighting: 4,
+		Lightning: 4,
 		SuperNova: 5,
 		Avengerdin: 6,
 		Hammerdin: 7,
@@ -549,12 +1059,12 @@ function SpeedBaal() {
 				}
 			},
 			FireBall: {
-				skills: [Skills.FireBall, Skills.Meteor, Skills.FireMastery],
+				skills: [Skills.FireBall, Skills.Meteor, Skills.FireMastery, Skills.FireBolt],
 			},
 			Blizzard: {
 				skills: [Skills.Blizzard, Skills.IceBlast, Skills.ColdMastery],
 			},
-			Lighting: {
+			Lightning: {
 				skills: [Skills.Lightning, Skills.ChainLightning, Skills.LightningMastery, Skills.Nova],
 			},
 			SuperNova: {
@@ -641,6 +1151,10 @@ function SpeedBaal() {
 			WarCry: {
 				skills: [Skills.WarCry, Skills.BattleCommand, Skills.BattleOrders],
 			},
+
+			Hurricane: {
+				skills: [Skills.Hurricane, Skills.Tornado]
+			}
 		},
 
 		getAttackSequence: function () {
@@ -657,6 +1171,8 @@ function SpeedBaal() {
 					return this.attackSequences.FireBall;
 				case this.SuperNova:
 					return this.attackSequences.SuperNova;
+				case this.Hurricane:
+					return this.attackSequences.Hurricane;
 				default:
 					return [ // Just plain attack
 						Skills.Normal,
@@ -664,30 +1180,34 @@ function SpeedBaal() {
 					]
 			}
 		},
-
 	};
 	var Communication = {
-		vault: {tick: 0},
+		vault: {
+			tick: 0,
+			diabloDone: false,
+			diabloUp: false,
+			nihlathakDone: false,
+			shrineUp: false,
+			shrineDone: false,
+		},
 		events: {
 			copydata: function (mode, msg) {
 				if (mode !== 0xDEAD && mode !== 0xBEEF && mode !== 0xDEADBEEF) {
 					return true;
 				}
 				var obj = JSON.parse(msg);
-				//debug(mode);
-				//debug(msg);
 				if (obj.who === false || getScript(true).name.toLowerCase().endsWith(obj.who)) {
 
 					switch (mode) {
 						case 0xDEADBEEF: // Run if it is directed at me
 							if (Communication.runnable.hasOwnProperty(obj.callable)) {
-								debug('\xFFc1can\'t run! ' + obj.callable);
+								debug('ÿc1can\'t run! ' + obj.callable);
 							}
 							Communication.runnable[obj.callable](obj.arguments);
 							break;
 						case 0xBEEF: // set value if directed to me
 							Communication.vault[obj.key] = obj.value;
-							//debug(obj.key + '=' + obj.value);
+							debug(obj.key + '=' + obj.value);
 							break;
 					}
 
@@ -750,9 +1270,12 @@ function SpeedBaal() {
 			}
 
 			Town.doChores();
-
 			// Non teling
 			if (Config.SpeedBaal.Follower) {
+				// In case we are not bo'd, but we have a CTA
+				if (!me.getState(States.BattleOrders)) {
+					this.goBo();
+				}
 				// Taking portal
 				if (me.area < Areas.Harrogath) {
 					Town.goToTown(4);
@@ -778,13 +1301,30 @@ function SpeedBaal() {
 					delay(100);
 				}
 			} else { // teling
-				Pather.useWaypoint(Areas.WorldstoneLvl2);
-				Precast.doPrecast();
-				Pather.moveToExit([Areas.WorldstoneLvl3, Areas.ThroneOfDestruction], true);
-				Pather.moveTo(15078, 5026);
-				// Make sure we find a relativily safe spot to cast portal
-				Attack.deploy({x: 15078, y: 5026}, 7, 2, 15);
-				Pather.makePortal();
+				if (me.area === Areas.Harrogath) {
+					if (Pather.getPortal(Areas.ThroneOfDestruction, null)) {
+
+						// Little trick to wait a second, to avoid the just portaled issues of bnet
+						if (justPortaledTick) {
+							do {
+								delay(250)
+							} while (getTickCount() - justPortaledTick < 5e3)
+						}
+						Pather.usePortal(Areas.ThroneOfDestruction, null);
+					}
+				}
+				if (me.area !== Areas.ThroneOfDestruction) {
+					// it can happen, throne tp is already up
+					Pather.useWaypoint(Areas.WorldstoneLvl2);
+					Precast.doPrecast();
+					Pather.moveToExit([Areas.WorldstoneLvl3, Areas.ThroneOfDestruction], true);
+					Pather.moveTo(15078, 5026);
+					if (!Pather.getPortal(Areas.Harrogath, null)) {
+						// Make sure we find a relatively safe spot to cast portal
+						Attack.deploy({x: 15078, y: 5026}, 7, 2, 15);
+						Pather.makePortal();
+					}
+				}
 			}
 			new Line(15070, 5000, 15120, 5000, 0x62, true);
 			new Line(15120, 5000, 15120, 5075, 0x62, true);
@@ -795,6 +1335,17 @@ function SpeedBaal() {
 			// Do the waves
 			while (this.waves.doWaves()) {
 				delay(1);
+			}
+
+			debug(Misc.inMyParty(skipBaalIfCharInGame));
+			debug(skipBaalWho.indexOf(me.name) !== -1);
+			if (Misc.inMyParty(skipBaalIfCharInGame) && skipBaalWho.indexOf(me.name) !== -1) {
+				Pather.moveTo(15092, 5011);
+				while (getUnit(1, 543)) {
+					delay(500);
+				}
+				delay(5000 + rand(0, 5000));
+				quit();
 			}
 
 			this.killBaal();
@@ -813,7 +1364,7 @@ function SpeedBaal() {
 			if (portal) {
 				Pather.usePortal(null, null, portal);
 			} else {
-				//debug('\xffc5Error: Portal not found');
+				//debug('ÿc5Error: Portal not found');
 				return false;
 			}
 			// We can assume we are now in the Worldstone Chamber
@@ -841,8 +1392,13 @@ function SpeedBaal() {
 					case Builds.FireBall:
 						spot = {x: 15091, y: 5018}; // they all benifit from standing next to baal, to attack like crazy once the waves come
 						break;
+					case Builds.Lightning:
+						spot = {x: 15078, y: 5026}; // On the side, left
+						if ([0].indexOf(baal.vault.currentWave) !== -1) {
+							spot = {x: 15093, y: 5029}; // Right in the heart of the wave
+						}
+						break;
 					case Builds.Blizzard:
-					case Builds.Lighting:
 						spot = {x: 15078, y: 5026}; // On the side, left
 						break;
 					case Builds.WarCry:
@@ -853,7 +1409,7 @@ function SpeedBaal() {
 					default:
 						spot = {x: 15094, y: 5038};// Just behind the waves, safe distance
 				}
-				if (getDistance(me, spot) < 5) {
+				if (getDistance(me, spot) < 2) {
 					return true; // Already pretty close, no need to move
 				}
 				return Pather.moveTo(spot.x, spot.y);
@@ -905,13 +1461,13 @@ function SpeedBaal() {
 							return false;
 						}
 
-						if (counter > 2000) { // 15091,5027
-							return Skill.cast(Skills.Meteor, 0, 15091 + rand(-1, 1), 5027 + rand(-1, 1));
+						if (counter > 2000) { // 15093,5025
+							return Skill.cast(Skills.Meteor, 0, 15093, 5025);
 						}
 						if (Builds.mine === Builds.SuperNova) {
 							return Skill.cast(Skills.Nova, 0, 15094 + rand(-1, 1), 5028 + rand(-1, 1));
 						} else {
-							return Skill.cast(Skills.FireBall, 0, 15094 + rand(-1, 1), 5028 + rand(-1, 1));
+							return Skill.cast(Skills.FireBall, 0, 15093, 5025);
 						}
 
 					case Builds.Blizzard:
@@ -968,11 +1524,15 @@ function SpeedBaal() {
 						}
 						return Skill.cast(Skills.ShockField);
 
-					case Builds.Lighting:
+					case Builds.Lightning:
 						if (counter > 2e3 || counter < -1e3) {
 							return false;
 						}
-						return Skill.cast(Skills.ChainLightning, 0, 15091, 5018); // cast chainlighting for max dmg
+						if (wave === 1) {
+							return Skill.cast(Skills.Nova, 0, 15094 + rand(-1, 1), 5028 + rand(-1, 1));
+						}
+						return Skill.cast(Skills.ChainLightning, 0, 15092, 5026); // cast chainlighting for max dmg
+
 				}
 				return true;
 			},
@@ -984,34 +1544,6 @@ function SpeedBaal() {
 				}
 				Precast.doPrecast(false); // Make sure everything is still here
 
-				/*
-				ToDo: This broke, need to fix good
-				// Check if we need to go to town to heal incase we are psn'ed and have low psn res
-				if (me.getState(2) && (me.getStat(45) - 100) < 50) {
-					if (!Pather.usePortal(Areas.Harrogath, null)) {
-						Pather.makePortal(true);
-					}
-					Town.initNPC("Heal", "heal"); // Talk to Malah
-
-					if (Config.PacketShopping) { // Only with packet shopping. Otherwise its too fast
-						Town.buyPotions(); // Since we are talking with Malah, we might as well buy some pots.
-						Town.fillTome(518); // Since we are already in trade with Malah, we can also refill the tp tome
-					}
-
-					me.cancel();
-					Town.moveToSpot('portal');
-
-					// Go back
-					if (!Pather.usePortal(Areas.ThroneOfDestruction, null)) {
-						throw new Error('Portal to throne disappeared, wtf?'); // Portal is gone? wtf.
-					}
-
-					// Did we take our own portal, if so recast it
-					if (!Pather.getPortal(Areas.Harrogath, null)) {
-						Pather.makePortal();
-					}
-				}
-				*/
 				var i;
 				switch (Builds.mine) {
 					case Builds.Trapsin:
@@ -1030,8 +1562,39 @@ function SpeedBaal() {
 						// Give everyone a bo, to avoid stupid people with cta
 						debug('precast');
 						return Precast.doPrecast(true);
+					case Builds.Hammerdin:
+						// In case we have ResistFire aura, set this on after wave 3
+						debug('wave: ' + wave);
+						if (baal.vault.currentWave === 3 && me.getSkill(Skills.ResistFire, 1)) {
+
+							return Skill.setSkill(Skills.ResistFire, 0);
+						}
+						return Skill.setSkill(Skills.Cleansing, 0); // saves time
 				}
 				return false;
+			},
+			castOnSpawn: function (wave) {
+				switch (Builds.mine) {
+					case Builds.SuperNova:
+						Skill.cast(Skills.StaticField);
+						Skill.cast(Skills.Nova);
+						Skill.cast(Skills.StaticField);
+						Skill.cast(Skills.Nova);
+						Skill.cast(Skills.StaticField);
+						break;
+					case Builds.Lightning:
+						Skill.cast(Skills.StaticField);
+						if (wave === 1) {
+							debug('nova?');
+							Skill.cast(Skills.Nova);
+							Skill.cast(Skills.Nova);
+							Skill.cast(Skills.Nova);
+							Skill.cast(Skills.Nova);
+							break;
+						}
+						Skill.cast(Skills.StaticField); // 2x static = 40% less hp of monsters
+						break;
+				}
 			},
 			doWaves: function () {
 				var wave;
@@ -1051,6 +1614,9 @@ function SpeedBaal() {
 					this.beforeWaveCasting(baal.vault.currentWave + 1, 12000 - (getTickCount() - Communication.vault.tick));
 
 					return true;
+				} else {
+					baal.vault.currentWave = wave;
+					this.castOnSpawn(wave);
 				}
 
 				// We are in wave:
@@ -1059,11 +1625,448 @@ function SpeedBaal() {
 				// Clear it
 				Attack.clear(wave);
 
+				debug('Communication.vault.diabloDone && Communication.vault.diabloUp');
+				debug(Communication.vault.diabloDone + '&&' + Communication.vault.diabloUp);
+				debug('wave:' + wave);
+				// After waves, we want to check if dia/shrine is up
+				var DiabloClearerParty = Misc.inMyParty(DiabloClearer),
+					ShrineSearcherParty = Misc.inMyParty(ShrineSearcher),
+					DiaUp = Communication.vault.diabloUp,
+					ShrineUp = Communication.vault.shrineUp,
+					ShrineDone = Communication.vault.shrineDone,
+					DiaDone = Communication.vault.diabloDone;
+				switch (true) {
+					// IF
+					case (DiabloClearerParty && ShrineSearcherParty) // Both dia/shrine creaters are in game
+					&& (!DiaDone && DiaUp) // Dia is up, but not done
+					&& (!ShrineDone && ShrineUp): // shrine is up, but not done
+					// OR
+					case ShrineSearcherParty && !DiabloClearerParty  // Shriner in game, dia clearer not.
+					&& (!ShrineDone && ShrineUp): // Shiner is up, but not done
+					// OR
+					case DiabloClearerParty && !ShrineSearcherParty  // Diablo clearer in game, shriner not.
+					&& (!DiaDone && DiaUp): // Diablo is up, but not done
+
+						// Go to town
+						if (Pather.getPortal(Areas.Harrogath, null)) {
+							Pather.usePortal(Areas.Harrogath, null);
+						} else {
+							Pather.makePortal(true);
+						}
+
+						if (!ShrineDone && ShrineUp) {
+							Town.goToTown(1);
+							Town.move('portalspot');
+							// ToDo: Get portals here
+							var portal = getUnit(2, "portal");
+							if (portal) {
+								do {
+									if (portal.getParent() === ShrineSearcher) {
+										// Use this portal
+										Pather.usePortal(null, null, copyUnit(portal));
+									}
+								} while (portal.getNext());
+
+								// if we are not in town anymore
+								if (me.area !== Areas.RogueEncampment) {
+									var shrine = getUnit(2, "shrine"), shrineList = [];
+									if (shrine) {
+										do {
+											if (shrine.mode === 0 && getDistance(me.x, me.y, shrine.x, shrine.y) <= 20) {
+												shrineList.push(copyUnit(shrine));
+											}
+										} while (shrine.getNext());
+
+
+										// We have a list of shrines now, around us
+										shrineList = shrineList.filter((x) => x.objtype === 15); // 15 is xp
+										if (shrineList.length !== 0) {
+											shrineList.sort(Pickit.sortItems); // Shrines are like items, you can sort it like items
+											debug('get shrine');
+											Misc.getShrine(shrineList[0]);
+											Communication.vault.shrineDone = true;
+										}
+									}
+									debug('teleport to wp');
+									Pather.getWP(me.area);
+									debug('go to act4');
+									Pather.useWaypoint(Areas.PandemoniumFortress);
+								}
+							}
+
+						}
+
+						if (!DiaDone && DiaUp) {
+							// Go to town
+							//ToDo: Nihalthak here
+
+							Town.move("waypoint");
+							Pather.useWaypoint(Areas.PandemoniumFortress); // go to act 4
+							while (me.act !== 4) {
+								delay(50);
+							}
+
+							if (Pather.usePortal(Areas.ChaosSanctuary, null) && me.area === Areas.ChaosSanctuary) {
+
+								// kill diablo
+								try {
+									Attack.kill(243); // Diablo
+									Pickit.pickItems();
+								} catch (e) {
+									// failed, big deal. Im sure someone stole the dia xp
+								}
+
+								// Go to town
+								if (Pather.getPortal(Areas.PandemoniumFortress, null)) {
+									Pather.usePortal(Areas.PandemoniumFortress, null);
+								} else {
+									Pather.makePortal(true);
+								}
+
+
+							}
+							Communication.vault.diabloDone = true;
+						}
+						if (me.area === Areas.PandemoniumFortress) {
+							Town.move("tyrael");
+
+							var npc = getUnit(1, "tyrael");
+							if (!npc || !npc.openMenu()) {
+								Town.goToTown(5); // Looks like we failed, lets go to act 5 by wp
+							} else {
+								Misc.useMenu(0x58D2); // Travel to Harrogath
+							}
+						}
+
+						if (me.area !== Areas.Harrogath) {
+							Town.goToTown(5);
+						}
+
+						Pather.usePortal(Areas.ThroneOfDestruction, null);
+						// Something is ready for me
+						break;
+
+					default:
+						break;
+				}
 				// On wave 5 we return a false, so we know the waves are done
 				return wave !== 5;
 			},
 		},
+		goBo: function (stay) {
+			function haveCTA() {
+				var item = me.getItem(-1, 1);
+				do {
+					if (item.getPrefix(20519)) { // 20519 = CTA
+						return true;
+					}
+				} while (item.getNext());
+				return false
+			}
+
+			// Why a barb doesn't bo here. He does it straight away when everyone gets in the portal so everyone have a good bo
+			if (!haveCTA() || me.classid === 4) {
+				return true;
+			}
+
+			Town.heal(); // This can be called before a do chores, so lets be sure we have enough health in before we go to a random location
+			me.cancel();
+			Pather.useWaypoint('random');
+			Precast.doPrecast(true);
+			if (stay) {
+				return true; // dont go back to town
+			}
+			return Pather.useWaypoint(Areas.PandemoniumFortress);
+		},
 	};
+
+	// Insta copy of diablo
+	var diablo = function () {
+		this.getLayout = function (seal, value) {
+			var sealPreset = getPresetUnit(108, 2, seal);
+
+			if (!seal) {
+				throw new Error("Seal preset not found");
+			}
+
+			if (sealPreset.roomy * 5 + sealPreset.y === value || sealPreset.roomx * 5 + sealPreset.x === value) {
+				return 1;
+			}
+
+			return 2;
+		};
+
+		this.initLayout = function () {
+			this.vizLayout = this.getLayout(396, 5275);
+			this.seisLayout = this.getLayout(394, 7773);
+			this.infLayout = this.getLayout(392, 7893);
+		};
+
+		this.getBoss = function (name) {
+			var i, boss,
+				glow = getUnit(2, 131);
+
+			for (i = 0; i < 24; i += 1) {
+				boss = getUnit(1, name);
+
+				if (boss) {
+					this.chaosPreattack(name, 8);
+
+					try {
+						Attack.kill(name);
+					} catch (e) {
+						Attack.clear(10, 0, name);
+					}
+
+					Pickit.pickItems();
+
+					return true;
+				}
+
+				delay(250);
+			}
+
+			return !!glow;
+		};
+
+		this.chaosPreattack = function (name, amount) {
+			var i, n, target, positions;
+
+			switch (me.classid) {
+				case 0:
+					break;
+				case 1:
+					break;
+				case 2:
+					break;
+				case 3:
+					target = getUnit(1, name);
+
+					if (!target) {
+						return;
+					}
+
+					positions = [[6, 11], [0, 8], [8, -1], [-9, 2], [0, -11], [8, -8]];
+
+					for (i = 0; i < positions.length; i += 1) {
+						if (Attack.validSpot(target.x + positions[i][0], target.y + positions[i][1])) { // check if we can move there
+							Pather.moveTo(target.x + positions[i][0], target.y + positions[i][1]);
+							Skill.setSkill(Config.AttackSkill[2], 0);
+
+							for (n = 0; n < amount; n += 1) {
+								Skill.cast(Config.AttackSkill[1], 1);
+							}
+
+							break;
+						}
+					}
+
+					break;
+				case 4:
+					break;
+				case 5:
+					break;
+				case 6:
+					break;
+			}
+		};
+
+		this.diabloPrep = function () {
+			var trapCheck,
+				tick = getTickCount();
+
+			while (getTickCount() - tick < 17500) {
+				if (getTickCount() - tick >= 8000) {
+					switch (me.classid) {
+						case 1: // Sorceress
+							if ([56, 59, 64].indexOf(Config.AttackSkill[1]) > -1) {
+								if (me.getState(121)) {
+									delay(500);
+								} else {
+									Skill.cast(Config.AttackSkill[1], 0, 7793, 5293);
+								}
+
+								break;
+							}
+
+							delay(500);
+
+							break;
+						case 3: // Paladin
+							Skill.setSkill(Config.AttackSkill[2]);
+							Skill.cast(Config.AttackSkill[1], 1);
+
+							break;
+						case 5: // Druid
+							if (Config.AttackSkill[1] === 245) {
+								Skill.cast(Config.AttackSkill[1], 0, 7793, 5293);
+
+								break;
+							}
+
+							delay(500);
+
+							break;
+						case 6: // Assassin
+							if (Config.UseTraps) {
+								trapCheck = ClassAttack.checkTraps({x: 7793, y: 5293});
+
+								if (trapCheck) {
+									ClassAttack.placeTraps({x: 7793, y: 5293, classid: 243}, trapCheck);
+
+									break;
+								}
+							}
+
+							delay(500);
+
+							break;
+						default:
+							delay(500);
+					}
+				} else {
+					delay(500);
+				}
+
+				if (getUnit(1, 243)) {
+					return true;
+				}
+			}
+
+			throw new Error("Diablo not found");
+		};
+
+		this.openSeal = function (classid) {
+			var i, j, seal;
+
+			for (i = 0; i < 5; i += 1) {
+				Pather.moveToPreset(108, 2, classid, classid === 394 ? 5 : 2, classid === 394 ? 5 : 0);
+
+				if (i > 1) {
+					Attack.clear(10);
+				}
+
+				for (j = 0; j < 3; j += 1) {
+					seal = getUnit(2, classid);
+
+					if (seal) {
+						break;
+					}
+
+					delay(100);
+				}
+
+				if (!seal) {
+					throw new Error("Seal not found (id " + classid + ")");
+				}
+
+				if (seal.mode) {
+					return true;
+				}
+
+				if (classid === 394) {
+					Misc.click(0, 0, seal);
+				} else {
+					seal.interact();
+				}
+
+				delay(classid === 394 ? 1000 : 500);
+
+				if (!seal.mode) {
+					if (classid === 394 && Attack.validSpot(seal.x + 15, seal.y)) { // de seis optimization
+						Pather.moveTo(seal.x + 15, seal.y);
+					} else {
+						Pather.moveTo(seal.x - 5, seal.y - 5);
+					}
+
+					delay(500);
+				} else {
+					return true;
+				}
+			}
+
+			throw new Error("Failed to open seal (id " + classid + ")");
+		};
+
+		Town.doChores();
+		Pather.useWaypoint(107);
+		Precast.doPrecast(true);
+		this.initLayout();
+		this.openSeal(395);
+		this.openSeal(396);
+
+		if (this.vizLayout === 1) {
+			Pather.moveTo(7691, 5292);
+		} else {
+			Pather.moveTo(7695, 5316);
+		}
+
+		if (!this.getBoss(getLocaleString(2851))) {
+			throw new Error("Failed to kill Vizier");
+		}
+
+		this.openSeal(394);
+
+		if (this.seisLayout === 1) {
+			Pather.moveTo(7771, 5196);
+		} else {
+			Pather.moveTo(7798, 5186);
+		}
+
+		if (!this.getBoss(getLocaleString(2852))) {
+			throw new Error("Failed to kill de Seis");
+		}
+
+		this.openSeal(393);
+		this.openSeal(392);
+
+		if (this.infLayout === 1) {
+			delay(1);
+		} else {
+			Pather.moveTo(7928, 5295); // temp
+		}
+
+		if (!this.getBoss(getLocaleString(2853))) {
+			throw new Error("Failed to kill Infector");
+		}
+
+		Pather.moveTo(7788, 5292);
+		if (Pather.getPortal(Areas.PandemoniumFortress)) {
+			Pather.usePortal(Areas.PandemoniumFortress);
+		} else {
+			Pather.makePortal(true); // If no portal exists, make and take.
+		}
+		return true;
+	};
+
+	var shrinesSearch = function () {
+		var gotit = false,
+			searchAreas = [Areas.ColdPlains, Areas.StonyField, Areas.DarkWood, Areas.BlackMarsh, Areas.JailLvl1, Areas.CatacombsLvl2]; // only area's with this wp
+
+		baal.goBo(true);
+
+		for (var i in searchAreas) {
+			let area = searchAreas[i];
+			Pather.useWaypoint(area);
+			if (Misc.getShrinesInArea(area, 15, false)) {
+				gotit = true;
+				break;
+			} else {
+				Pather.getWP(me.area);
+			}
+
+		}
+		if (gotit) {
+			Pather.makePortal(true);
+			Town.goToTown(2);
+			delay(2500);
+			Town.goToTown(4);
+		} else {
+			// Already interacting with an wp;
+			Pather.useWaypoint(Areas.PandemoniumFortress, true) // Go to act 4.
+		}
+	};
+
 	var Overloading = {
 		vault: {}, // to store data in
 		do: function () { // override them
@@ -1156,7 +2159,7 @@ function SpeedBaal() {
 						// Monster still in reach?
 						if (target.x !== undefined && // Only if defined
 							!(
-								target.x > 15070 && target.x < 15120 // Between the x coords
+								target.x > 15070 && target.x < 15120 // Between the x coords‘
 								&& target.y > 5000 && target.y < 5075 // And between the y coords
 							)) {
 							monsterList.shift();
@@ -1171,17 +2174,21 @@ function SpeedBaal() {
 						}
 
 						if (target.x !== undefined && Attack.checkMonster(target)) {
-							// Dodge or get in position
-							if (Config.Dodge && me.hp * 100 / me.hpmax <= Config.DodgeHP) {
-								Attack.deploy(target, Config.DodgeRange, 5, 9);
-							} else {
-								Attack.getIntoPosition(target, Skill.getRange(Config.AttackSkill[(target.spectype & 0x7) ? 1 : 3]), 0x4)
+							// Dodge or get in position, or stand still if we are in use of xp shrine
+							if (!me.getState(States.ShrineExperience)) {
+								if (Config.Dodge && me.hp * 100 / me.hpmax <= Config.DodgeHP) {
+									Attack.deploy(target, Config.DodgeRange, 5, 9);
+								} else {
+									Attack.getIntoPosition(target, Skill.getRange(Config.AttackSkill[(target.spectype & 0x7) ? 1 : 3]), 0x4)
+								}
 							}
 
 							if (wave === 0) {
 								// Only during clearing the throne, not during a wave.
 								Misc.townCheck(true);
-								Pickit.pickItems();
+								if (!me.getState(States.ShrineExperience)) {
+									Pickit.pickItems(); // Pick items, but not if we have xp shrine
+								}
 							}
 
 							me.overhead("attacking " + target.name + " spectype " + target.spectype + " id " + target.classid);
@@ -1207,16 +2214,20 @@ function SpeedBaal() {
 
 							} else {
 								monsterList.shift();
-								Pickit.pickItems();
+								if (!me.getState(States.ShrineExperience)) {
+									Pickit.pickItems();
+								}
 							}
 						} else {
 							monsterList.shift();
-							Pickit.pickItems();
+							if (!me.getState(States.ShrineExperience)) {
+								Pickit.pickItems();
+							}
 						}
 
 						// It happens from time to time, the one that teleported chickend and there is no tp to throne anymore,
 						// only if we still can find baal's sitting in the throne
-						if (!Pather.getPortal(Areas.Harrogath, null) && getUnit(1, 543)) {
+						if (!Pather.getPortal(Areas.Harrogath, null) && getUnit(1, 543) && me.name === ShrineSearcher) {
 							Pather.makePortal(); // Make portal to Harrogath
 						}
 					}
@@ -1233,8 +2244,97 @@ function SpeedBaal() {
 					// Prepare for next wave
 					baal.waves.moveToPreattack();
 					baal.waves.afterWaveChecks();
-
 					return true;
+				},
+			},
+			Pather: {
+				// We want to use telekenis on portals.
+				// So use the _old_ usePortal function, since it came back
+				usePortal: function (targetArea, owner, unit) {
+					if (targetArea && me.area === targetArea) {
+						return true;
+					}
+
+					me.cancel();
+
+					var i, tick, portal, useTK,
+						preArea = me.area;
+
+					for (i = 0; i < 10; i += 1) {
+						if (me.dead) {
+							break;
+						}
+
+						if (i > 0 && owner && me.inTown) {
+							Town.move("portalspot");
+						}
+
+						portal = unit ? copyUnit(unit) : Pather.getPortal(targetArea, owner);
+
+						if (portal) {
+							if (i === 0) {
+								useTK = me.classid === 1 && me.getSkill(43, 1) && me.inTown && portal.getParent();
+							}
+
+							if (portal.area === me.area) {
+								if (useTK) {
+									if (getDistance(me, portal) > 10) {
+										Attack.getIntoPosition(portal, 10, 0x4);
+									}
+
+									Skill.cast(43, 0, portal);
+								} else {
+									if (getDistance(me, portal) > 5) {
+										Pather.moveToUnit(portal);
+									}
+
+									if (i < 2) {
+										sendPacket(1, 0x13, 4, 0x2, 4, portal.gid);
+									} else {
+										Misc.click(0, 0, portal);
+									}
+								}
+							}
+
+							if (portal.classid === 298 && portal.mode !== 2) { // Portal to/from Arcane
+								Misc.click(0, 0, portal);
+
+								tick = getTickCount();
+
+								while (getTickCount() - tick < 2000) {
+									if (portal.mode === 2 || me.area === 74) {
+										break;
+									}
+
+									delay(10);
+								}
+							}
+
+							tick = getTickCount();
+
+							while (getTickCount() - tick < Math.max(Math.round((i + 1) * 1000 / (i / 5 + 1)), me.ping * 2)) {
+								if (me.area !== preArea) {
+									delay(100);
+
+									return true;
+								}
+
+								delay(10);
+							}
+
+							if (i > 1) {
+								Packet.flash(me.gid);
+
+								useTK = false;
+							}
+						} else {
+							Packet.flash(me.gid);
+						}
+
+						delay(200 + me.ping);
+					}
+
+					return targetArea ? me.area === targetArea : me.area !== preArea;
 				},
 			}
 		}
@@ -1242,7 +2342,7 @@ function SpeedBaal() {
 
 	// Either run the thread functions, or load the thread
 	if (startThread()) {
-		return; // We where the thread, returning now
+		return; // // We come here *after* the thread ran. Aka end of game
 	}
 
 	// If we are teleporting, we want to start fast in new game.
@@ -1266,12 +2366,93 @@ function SpeedBaal() {
 		addToPickit('[name] == gold # [gold] >= 100');
 	}
 
+	/**
+	 * Quick fix for CTA. It happens we have it on the second slot
+	 */
+
+	Precast.checkCTA();
+	if (Precast.haveCTA) {
+		Precast.weaponSwitch(1 - Precast.haveCTA); // Switch to the correct weapon (the one that isnt cta
+	} else {
+		Precast.weaponSwitch(0); // make sure you wear gear on FIRST slot
+	}
+
 	debug('Starting baal');
 	Builds.init();
 
-	Communication.waitFor('threadStarted', true);
+	//Communication.waitFor('threadStarted', true);
 	try {
 		Overloading.do();
+
+		if (me.name === ShrineSearcher) {
+			// Time to search for the shrine
+			try {
+				shrinesSearch();
+			} catch (e) {
+				Town.goToTown();
+			}
+		}
+
+		// Do quickly nihla
+		if (me.name === Nihla) {
+			try {
+				(function () {
+					Town.doChores();
+					Pather.useWaypoint(123);
+					Precast.doPrecast(false);
+
+					if (!Pather.moveToExit(124, true)) {
+						throw new Error("Failed to go to Nihlathak");
+					}
+
+					Pather.moveToPreset(me.area, 2, 462, 0, 0, false, true);
+
+					if (Config.Nihlathak.ViperQuit && getUnit(1, 597)) {
+						print("Tomb Vipers found.");
+						return true;
+					}
+
+					var target;
+					for (i = 0; i < 5; i += 1) {
+						target = getUnit(1, 526);
+						delay(200);
+					}
+
+					if (Attack.skipCheck(target)) {
+						Attack.kill(526); // Nihlathak
+						Pickit.pickItems();
+					}
+
+					Town.goToTown(); // Fast tp -> go
+					justPortaledTick = getTickCount();
+
+					return true;
+				})()
+			} catch (e) {
+
+			}
+		}
+
+		// Prepare dia
+		if (me.name === DiabloClearer) {
+			try {
+				diablo();
+			} catch (e) {
+				Town.goToTown();
+			}
+			Town.move("tyrael");
+			if (Town.needMerc()) {
+				Town.reviveMerc();
+			}
+			var npc = getUnit(1, "tyrael");
+			if (!npc || !npc.openMenu()) {
+				Town.goToTown(5); // Looks like we failed, lets go to act 5 by wp
+			} else {
+				Misc.useMenu(0x58D2); // Travel to Harrogath
+			}
+		}
+
+		// Baal run itself
 		baal.run();
 	} catch (e) {
 		throw e;
