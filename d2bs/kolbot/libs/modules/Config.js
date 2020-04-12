@@ -226,7 +226,6 @@
 	Config.TeleStomp = false;
 	Config.ClearType = false;
 	Config.ClearPath = false;
-	Config.BossPriority = false;
 
 
 	// Assassin specific
@@ -274,6 +273,10 @@
 	};
 	Config.Countess = {
 		KillGhosts: false
+	};
+	Config.Coldworm = {
+		KillBeetleburst: false,
+		ClearMaggotLair: false,
 	};
 	Config.Baal = {
 		DollQuit: false,
