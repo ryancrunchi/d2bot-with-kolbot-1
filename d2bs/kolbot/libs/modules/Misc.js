@@ -126,7 +126,10 @@
 		},
 
 		// Open a chest Unit
-		openChest: function (unit) {
+		openChest: function (unit, maxDelay) {
+			if (maxDelay === undefined) {
+				maxDelay = 1000;
+			}
 			// Skip invalid and Countess chests
 			if (!unit || unit.x === 12526 || unit.x === 12565) {
 				return false;
@@ -152,7 +155,7 @@
 
 				tick = getTickCount();
 
-				while (getTickCount() - tick < 1000) {
+				while (getTickCount() - tick < maxDelay) {
 					if (unit.mode) {
 						return true;
 					}

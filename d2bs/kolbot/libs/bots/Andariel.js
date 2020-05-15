@@ -4,26 +4,44 @@
 *	@desc		kill Andariel
 */
 
-module.exports =  function(Config, Attack, Pickit, Pather, Town, Misc) {
-	Town();
-	if (me.getStat(sdk.stats.Poisonresist) < 75) {
-		Town.stackPotions('yps');
-	}
-	if (!Pather.journeyTo(sdk.areas.CatacombsLvl4)) {
-		throw Error('Failed to move to Andariel');
-	}
+(function (module,require) {
+	const Andariel = function (Config, Attack, Pickit, Pather, Town) {
+		Andariel.kill();
+	};
+	const Attack = require('Attack'),
+			Pickit = require('Pickit'),
+			Pather = require('Pather'),
+			Town = require('Town');
 
-	Pather.moveTo(22549, 9520);
-	const andy = getUnit(1,sdk.monsters.Andariel); // Andariel
+	Andariel.kill = () => {
+		if (me.getStat(sdk.stats.Poisonresist) < 75) {
+			Town.goToTown();
+			Town.stackPotions('yps');
+		}
+		if (!Pather.journeyTo(sdk.areas.CatacombsLvl4)) {
+			return false;
+		}
 
-	if (!andy) throw new Error('Andariel not found');
+		Pather.moveTo(22549, 9520);
+		const andy = getUnit(sdk.unittype.Monsters, sdk.monsters.Andariel);
 
-	andy.kill();
+		if (!andy) {
+			return true;
+		}
 
-	// Wait for minions to die.
-	while(getUnits(1).filter(x=>x.attackable).filter(x=>getDistance(andy,x) < 15).length > 3) delay(3);
+		andy.kill();
 
-	Pickit.pickItems();
+		// Wait for minions to die.
+		while(getUnits(sdk.unittype.Monsters)
+			.filter(x => x.attackable)
+			.filter(x => getDistance(andy, x) < 15).length > 3) {
+			delay(3);
+		}
 
-	return true;
-};
+		Pickit.pickItems();
+
+		return true;
+	};
+
+	module.exports = Andariel;
+})(typeof module === 'object' && module || {}, typeof require === 'undefined' && (include('require.js') && require) || require );

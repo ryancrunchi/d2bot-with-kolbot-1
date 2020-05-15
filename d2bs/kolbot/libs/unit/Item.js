@@ -133,8 +133,13 @@ Object.defineProperties(Unit.prototype, {
 	identified: {
 		get: function () {
 			if (this.type !== sdk.unittype.Item) return undefined; // Can't tell, as it isn't an item
-
 			return this.getFlag(0x10);
+		}
+	},
+	ethereal: {
+		get: function () {
+			if (this.type !== sdk.unittype.Item) return undefined; // Can't tell, as it isn't an item
+			return this.getFlag(0x400000);
 		}
 	}
 });

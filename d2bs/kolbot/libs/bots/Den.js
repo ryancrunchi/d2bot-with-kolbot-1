@@ -4,7 +4,7 @@
  */
 (function (module,require) {
 	const Den = function (Config, Attack, Pickit, Pather, Town) {
-		
+		Den.clear();
 	};
 	const Promise = require('Promise'),
 			Attack = require('Attack'),
@@ -39,13 +39,8 @@
 
 	Den.clear = () => {
 		Pather.journeyTo(sdk.areas.DenOfEvil, true);
-		let graph = new Graph();
-		Graph.nearestNeighbourSearch(graph, (room) => {
-			Pather.moveTo(room.walkableX, room.walkableY, 3, true);
-			// 0xF = skip normal, 0x7 = champions/bosses, 0 = all
-			Attack.clear(room.xsize*0.707, 0);
-			Pather.moveTo(room.walkableX, room.walkableY, 3, true);
-			Pickit.pickItems();
+		Attack.clearLevelWalk(0, () => {
+			return Quests.states[sdk.quests.DenOfEvil][0] == 1;
 		});
 	};
 

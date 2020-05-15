@@ -260,6 +260,11 @@ Array.prototype.symmetricDifference = function (other) {
 		.concat(other.filter(e => !this.includes(e)))
 };
 
+Array.prototype.doForEach = function (callback) {
+	this.forEach(callback);
+	return this;
+}
+
 
 // Returns a random integer between start and end included.
 Math.randomIntBetween = function (start, end) {

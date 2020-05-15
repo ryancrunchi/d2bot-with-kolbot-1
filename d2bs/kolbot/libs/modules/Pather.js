@@ -482,7 +482,7 @@
 								let targetRoom = this.getNearestRoom(areas[i]);
 
 								if (targetRoom) {
-									this.moveTo(targetRoom[0], targetRoom[1]);
+									this.moveTo(targetRoom[0], targetRoom[1], 3, clearPath);
 								} else {
 									// might need adjustments
 									return false;
@@ -1129,7 +1129,7 @@
 				wpIDs = [119, 145, 156, 157, 237, 238, 288, 323, 324, 398, 402, 429, 494, 496, 511, 539];
 
 			if (area !== me.area) {
-				this.journeyTo(area);
+				this.journeyTo(area, clearPath);
 			}
 
 			for (i = 0; i < wpIDs.length; i += 1) {
@@ -1205,7 +1205,7 @@
 				!me.inTown && Precast();
 
 				if (this.wpAreas.indexOf(me.area) > -1 && !getWaypoint(this.wpAreas.indexOf(me.area))) {
-					this.getWP(me.area);
+					this.getWP(me.area, clearPath);
 				}
 
 				if (me.inTown && this.wpAreas.indexOf(target.course[0]) > -1 && getWaypoint(this.wpAreas.indexOf(target.course[0]))) {
@@ -1389,7 +1389,7 @@
 		},
 
 		walkDistanceTo: function (x, y) {
-			return walkPathDistance(me.x, me.y, x, y);
+			return this.walkPathDistance(me.x, me.y, x, y);
 		},
 
 		walkPathDistance: function (x, y, xx, yy) {

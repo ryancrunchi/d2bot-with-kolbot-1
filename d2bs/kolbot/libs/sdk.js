@@ -710,6 +710,10 @@ let sdk = {
         ScrollWindow: 0x25
     },
 
+    partyFlags: {
+        Hostile: 8
+    },
+
     waypoints: {
         act1: [0x01, 0x03, 0x04, 0x05, 0x06, 0x1b, 0x1d, 0x20, 0x23],
         act2: [0x28, 0x30, 0x2a, 0x39, 0x2b, 0x2c, 0x34, 0x4a, 0x2e],
@@ -2422,6 +2426,34 @@ let sdk = {
         Missiles: 3,
         Item: 4,
         Stairs: 5, // ToDo: might be more as stairs
+    },
+    unitmode: {
+        Death: 0,
+        StandingOutTown: 1,
+        Walking: 2,
+        Running: 3,
+        Hit: 4,
+        StandingInTown: 5,
+        WalkingInTown: 6,
+        Attacking1: 7,
+        Attacking2: 8,
+        Blocking: 9,
+        Casting: 10,
+        Throwing: 11,
+        Kicking: 12,
+        UsingSkill1: 13,
+        UsingSkill2: 14,
+        UsingSkill3: 15,
+        UsingSkill4: 16,
+        Dead: 17,
+        Sequence: 18,
+        KnockedBack: 19
+    },
+    spectype: {
+        Boss: 0x1,
+        Champion: 0x2,
+        Unique: 0x4,
+        Minion: 0x8
     },
     itemquality: {
         lowquality: 1,

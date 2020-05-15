@@ -42,7 +42,24 @@
 		},*/
 
 		TheSearchForCain: function () {
-			require("../bots/Cain")(Config, Attack, Pickit, Pather, Town);
+			const Cain = require("../bots/Cain");
+
+			if (Quests.states[sdk.quests.TheSearchForCain][0]) {
+				return true;
+			}
+
+			if (!Quests.states[sdk.quests.TheSearchForCain][4]) {
+				Cain.getScroll();
+				Cain.openStones();
+			}
+			if (!Quests.states[sdk.quests.TheSearchForCain][1]) { // cain rescued, need to talk to him and akara
+				Cain.rescue();
+			}
+			if (Quests.states[sdk.quests.TheSearchForCain][1]) {
+				Cain.talk();
+			}
+
+			return Quests.states[sdk.quests.TheSearchForCain][0];
 		},
 
 		ForgottenTower: function () {
@@ -54,7 +71,12 @@
 		},
 */
 		SistersToTheSlaughter: function () {
-			require("../bots/Andariel")(Config, Attack, Pickit, Pather, Town);
+			if (Quests.states[sdk.quests.SistersToTheSlaughter][0]) {
+				return true;
+			}
+			const Andariel = require("../bots/Andariel");
+			Andariel(Config, Attack, Pickit, Pather, Town);
+			return Quests.states[sdk.quests.SistersToTheSlaughter][0];
 		},
 /*
 		AbleToGotoActII: function () {

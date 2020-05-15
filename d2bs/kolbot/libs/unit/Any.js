@@ -251,13 +251,195 @@ Object.defineProperty(PresetUnit.prototype, 'unit', {
 	enumerable: true
 });
 
+Object.defineProperty(Unit.prototype, "ownerUnit", {
+	get: function() {
+		if (this.owner == undefined || this.ownertype == undefined) {
+			return undefined;
+		}
+		return getUnit(this.ownertype, null, null, this.owner);
+	},
+	enumerable: true
+});
+
+Object.defineProperty(Unit.prototype, 'equals', {
+	value: function (other) {
+		if (other == undefined || other == null) {
+			return false;
+		}
+		return other.constructor == this.constructor &&
+			other.type == this.type &&
+			other.classid == this.classid &&
+			other.gid == this.gid;
+	}
+});
+
 /**
  * Simple functionality to read the distance between you and an unit.
  * Example: getUnit(...).distance <-- gives the distance between you and the unit.
  */
 Object.defineProperty(Unit.prototype, 'distance', {
 	get: function() {
-		return getDistance(me,this);
+		return me.distanceTo(this);
 	},
 	enumerable: true
+});
+
+Object.defineProperty(Unit.prototype, 'distanceTo', {
+	value: function (other) {
+		return getDistance(this, other);
+	}
+});
+
+Object.defineProperty(Unit.prototype, 'manhattanDistanceTo', {
+	value: function (other) {
+		let x = Math.abs(other.x - this.x);
+		let y =  Math.abs(other.y - this.y);
+		return x+y;
+	},
+	enumerable: false,
+	configurable: false
+});
+
+Object.defineProperty(Unit.prototype, 'isHostile', {
+	get: function () {
+		if (this.gid == undefined || this.gid == null) return false;
+		return getPlayerFlag(me.gid, this.gid, sdk.partyFlags.Hostile);
+	},
+	enumerable: true,
+	configurable: false
+});
+
+Object.defineProperty(Unit.prototype, 'sizeX', {
+	get: function () {
+		if (this.type == sdk.unittype.Monsters) {
+			let baseId = getBaseStat("monstats", this.classid, "baseid");
+			return getBaseStat("monstats2", baseId, "SizeX");
+		}
+		return this.sizex;
+	},
+	enumerable: true,
+	configurable: false
+});
+
+Object.defineProperty(Unit.prototype, 'sizeY', {
+	get: function () {
+		if (this.type == sdk.unittype.Monsters) {
+			let baseId = getBaseStat("monstats", this.classid, "baseid");
+			return getBaseStat("monstats2", baseId, "SizeY");
+		}
+		return this.sizey;
+	},
+	enumerable: true,
+	configurable: false
+});
+
+Object.defineProperty(Unit.prototype, 'size', {
+	get: function () {
+		if (this.type == sdk.unittype.Missiles) {
+			return getBaseStat("missiles", this.classid, "Size");
+		}
+		return this.sizeX;
+	},
+	enumerable: true,
+	configurable: false
+});
+
+Object.defineProperty(Unit.prototype, 'velocity', { // units/sec
+	get: function () {
+		if (this.type == sdk.unittype.Missiles) {
+			return getBaseStat("missiles", this.classid, "Vel");
+		}
+		if (this.type == sdk.unittype.Monsters) {
+			return getBaseStat("monstats", this.classid, (this.running ? "Run" : "Velocity"));
+		}
+		if (this.type == sdk.unittype.Player) {
+			return this.running ? 9 : 6; //TODO: frw
+		}
+		return undefined;
+	},
+	enumerable: true,
+	configurable: false
+});
+
+Object.defineProperty(Unit.prototype, 'velocityUnitPerFrame', {
+	get: function () {
+		if (this.velocity != undefined) {
+			return this.velocity * 0.04; // units/s to unit/frame
+		}
+		return undefined;
+	},
+	enumerable: true,
+	configurable: false
+});
+
+Object.defineProperty(Unit.prototype, 'running', {
+	get: function () {
+		const runningTypes = [sdk.unittype.Player, sdk.unittype.Monsters, sdk.unittype.Missiles];
+		return runningTypes.indexOf(this.type) > -1 ? this.mode == sdk.unitmode.Running : false;
+	},
+	enumerable: true,
+	configurable: false
+});
+
+Object.defineProperty(Unit.prototype, 'minimapColor', {
+	get: function () {
+		if (this.spectype) {
+			if (this.spectype & sdk.spectype.Boss) {
+				return 0x54;
+			}
+			if (this.spectype & sdk.spectype.Champion) {
+				return 0x97;
+			}
+			if (this.spectype & (sdk.spectype.Unique + sdk.spectype.Minion)) {
+				return 0x6D;
+			}
+		}
+		return 0x62;
+	},
+	enumerable: false,
+	configurable: false
+});
+
+Object.defineProperty(Unit.prototype, 'minimapRelativeDrawingVertices', {
+	value: function (scale) {
+		if (!scale) {
+			scale = 1;
+		}
+		let size = this.size;
+		let offset = scale/2;
+		let startX = -offset;
+		let startY = -offset - size + scale;
+		let currentX = startX;
+		let currentY = startY;
+		let color = this.minimapColor;
+		let lines = [];
+		
+		for (var side = 0; side < 4; side++) {
+			for (var i = 0; i < 2*size-1; i++) {
+				var xFactor = side == 0 || side == 3 ? 1 : -1;
+				var yFactor = side == 0 || side == 1 ? 1 : -1;
+				var dx = (side+i)%2 == 0 ? scale*xFactor : 0;
+				var dy = (side+i)%2 == 0 ? 0 : scale*yFactor;
+				var nextX = currentX + dx;
+				var nextY = currentY + dy;
+				lines.push({x: currentX, y: currentY, x2: nextX, y2: nextY});
+				currentX = nextX;
+				currentY = nextY;
+			}
+		}
+		return lines;
+	},
+	enumerable: false,
+	configurable: false
+});
+
+Object.defineProperty(Line.prototype, 'offsetBy', {
+	value: function (dx, dy) {
+		this.x += dx;
+		this.x2 += dx;
+		this.y += dy;
+		this.y2 += dy;
+	},
+	enumerable: false,
+	configurable: false
 });

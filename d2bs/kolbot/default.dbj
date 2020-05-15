@@ -13,15 +13,6 @@ function main() {
 		delay(50);
 	}
 
-	if (getScript("d2botmap.dbj")) {
-		load("tools/mapthread.js");
-		load("tools/ToolsThread.js");
-
-		while (true) {
-			delay(1000);
-		}
-	}
-
 	// don't load default for mules
 	if (getScript("D2BotMule.dbj")) {
 		return true;
@@ -74,8 +65,8 @@ function main() {
 	const Town = require('Town');
 
 	Town.getCorpse();
-	me.charlvl > 1 && Town.clearBelt();
-	me.charlvl > 1 && Town.clearInventory();
+	// me.charlvl > 1 && Town.clearBelt();
+	// me.charlvl > 1 && Town.clearInventory();
 	Pickit.pickItems();
 
 	me.automap = Config.AutoMap;

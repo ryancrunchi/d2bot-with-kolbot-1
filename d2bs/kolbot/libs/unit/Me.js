@@ -171,12 +171,24 @@
 				}
 				return low;
 			}
-		}
+		},
+		sizeX: {
+			value: 2,
+			enumerable: true,
+			writable: false,
+			configurable: false
+		},
+		sizeY: {
+			value: 2,
+			enumerable: true,
+			writable: false,
+			configurable: false
+		},
 	});
 
 	me.journeyToPreset = function (area, unitType, unitId, offX, offY, clearPath, pop) {
 		const Pather = require('Pather');
-		if (me.area !== area) Pather.journeyTo(area);
+		if (me.area !== area) Pather.journeyTo(area, clearPath);
 
 		return Pather.moveToPreset(area, unitType, unitId, offX, offY, clearPath, pop);
 	};
@@ -317,6 +329,7 @@
 	me.getQuestItem = function (classid, chestid) { // Accepts classid only or a classid/chestid combination.
 		const Storage = require('Storage'),
 			Pickit = require('Pickit'),
+			Misc = require('Misc'),
 			Town = require('Town');
 		var i, chest, item,
 			tick = getTickCount();
@@ -378,7 +391,7 @@
 			}
 			//Packet.flash(me.gid);
 			delay(me.ping * 2 + 500);
-			Pather.moveTo(me.x + rand(-5, 5), me.y + rand(-5, 5));
+			me.moveBy(rand(-5, 5), rand(-5, 5));
 		}
 
 		return false;

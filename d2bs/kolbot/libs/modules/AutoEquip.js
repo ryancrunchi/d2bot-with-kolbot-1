@@ -93,19 +93,31 @@
 				// 0='amazon',1='sorc',2='necro',3='paladin',4='barb',5='druid',6='assassin'
 				// ToDo; make
 
+			},
+			eth = () => {
+				if (!item.ethereal) {
+					return 1;
+				}
+				let factor = 1.5;
+				if (item.getStatEx(sdk.stats.ReplenishDurability) > 0 || item.getStatEx(sdk.stats.ReplenishQuantity) > 0) {
+					return factor;
+				}
+				return 1 / factor;
 			};
 
 		const tiers = {
 			helm: {
-				magic: () => (skills() * 1000)
-					+ (elementDmg() * 100)
-					+ ((hpmp() + res()) * 100)
-					+ def(),
+				magic: () => (skills() * 1000
+					+ elementDmg() * 100
+					+ (hpmp() + res()) * 100
+					+ def())
+					* eth(),
 
-				rare: () => (skills() * 10000)
-					+ (elementDmg() * 1000)
-					+ ((hpmp() + res()) * 1000)
-					+ def()
+				rare: () => (skills() * 10000
+					+ elementDmg() * 1000
+					+ (hpmp() + res()) * 1000
+					+ def())
+					* eth()
 			},
 
 			amulet: {
@@ -126,47 +138,53 @@
 			},
 
 			armor: {
-				magic: () => (skills() * 10000)
-					+ (res() * 1000)
-					+ (elementDmg() * 1000)
-					+ (strdex() * 1000)
-					+ (hpmp() * 100)
-					+ def(),
+				magic: () => (skills() * 10000
+					+ res() * 1000
+					+ elementDmg() * 1000
+					+ strdex() * 1000
+					+ hpmp() * 100
+					+ def())
+					* eth(),
 
-				rare: () => (skills() * 100000)
-					+ (res() * 10000)
-					+ (elementDmg() * 10000)
-					+ (strdex() * 10000)
-					+ (hpmp() * 1000)
-					+ def(),
+				rare: () => (skills() * 100000
+					+ res() * 10000
+					+ elementDmg() * 10000
+					+ strdex() * 10000
+					+ hpmp() * 1000
+					+ def())
+					* eth(),
 			},
 
 			weapon: {
-				magic: () => (skills() * 10000)
-					+ (elementDmg() * 5000)
-					+ (res() * 1000)
-					+ (hpmp() * 100)
-					+ (strdex() * 10)
-					+ fcr(),
+				magic: () => (skills() * 10000
+					+ elementDmg() * 5000
+					+ res() * 1000
+					+ hpmp() * 100
+					+ strdex() * 10
+					+ fcr())
+					* eth(),
 
-				rare: () => ((skills()) * 10000)
-					+ (elementDmg() * 5000)
-					+ (res() * 1000)
-					+ ((hpmp() + strdex()) * 1000)
-					+ fcr()
+				rare: () => (skills() * 10000
+					+ elementDmg() * 5000
+					+ res() * 1000
+					+ (hpmp() + strdex()) * 1000
+					+ fcr())
+					* eth(),
 			},
 			shield: {
-				magic: () => (res() * 10000)
-					+ (elementDmg() * 5000)
-					+ ((strdex() + vita()) * 1000)
-					+ ((fbr() + ctb()) * 100)
-					+ def(),
+				magic: () => (res() * 10000
+					+ elementDmg() * 5000
+					+ (strdex() + vita()) * 1000
+					+ (fbr() + ctb()) * 100
+					+ def())
+					* eth(),
 
-				set: () => (res() * 100000)
-					+ (elementDmg() * 50000)
-					+ ((strdex() + vita()) * 10000)
-					+ ((fbr() + ctb()) * 1000)
-					+ def(),
+				set: () => (res() * 100000
+					+ elementDmg() * 50000
+					+ (strdex() + vita()) * 10000
+					+ (fbr() + ctb()) * 1000
+					+ def())
+					* eth(),
 			},
 
 			ring: {
@@ -179,43 +197,49 @@
 			},
 
 			belt: {
-				magic: () => (res() * 10000)
-					+ (strdex() * 1000)
-					+ (hpmp() * 100)
-					+ (fhr() * 10)
-					+ def(),
+				magic: () => (res() * 10000
+					+ strdex() * 1000
+					+ hpmp() * 100
+					+ fhr() * 10
+					+ def())
+					* eth(),
 
-				rare: () => (res() * 100000)
-					+ (strdex() * 10000)
-					+ (hpmp() * 1000)
-					+ (fhr() * 10)
-					+ def()
+				rare: () => (res() * 100000
+					+ strdex() * 10000
+					+ hpmp() * 1000
+					+ fhr() * 10
+					+ def())
+					* eth()
 			},
 
 			boots: {
-				magic: () => (res() * 10000)
-					+ ((strdex() + vita()) * 100)
-					+ (hpmp() * 100)
-					+ (frw() * 10)
-					+ def(),
+				magic: () => (res() * 10000
+					+ (strdex() + vita()) * 100
+					+ hpmp() * 100
+					+ frw() * 10
+					+ def())
+					* eth(),
 
-				rare: () => (res() * 100000)
-					+ ((strdex() + vita()) * 10000)
-					+ (hpmp() * 1000)
-					+ (frw() * 10)
-					+ def(),
+				rare: () => (res() * 100000
+					+ (strdex() + vita()) * 10000
+					+ hpmp() * 1000
+					+ frw() * 10
+					+ def())
+					* eth(),
 			},
 
 			gloves: {
-				magic: () => ((res() + skills()) * 10000)
-					+ (strdex() * 1000)
-					+ (hpmp() * 100)
-					+ def(),
+				magic: () => ((res() + skills()) * 10000
+					+ strdex() * 1000
+					+ hpmp() * 100
+					+ def())
+					* eth(),
 
-				rare: () => ((res() + skills()) * 100000)
-					+ (strdex() * 10000)
-					+ (hpmp() * 1000)
-					+ def(),
+				rare: () => ((res() + skills()) * 100000
+					+ strdex() * 10000
+					+ hpmp() * 1000
+					+ def())
+					* eth(),
 			},
 
 		};
@@ -229,7 +253,7 @@
 			tierFuncs = Object.keys(tiers).map(key => tiers[key])[bodyLoc - 1];
 
 		if (tierFuncs === undefined) {
-			print('klasdfjlkasdjflkasdjflkasdjflkasdjfkl --- ' + item.name);
+			//print('klasdfjlkasdjflkasdjflkasdjflkasdjfkl --- ' + item.name);
 			//throw Error('Should not happen?');
 			return 0;
 		}
@@ -277,25 +301,24 @@
 
 			if (!bodyLoc) return false; // Only items that we can wear
 
+			if (!item.identified) { // Tell the network we need to identify it first
+				return -1; // We want to identify this
+			}
+
 			const forClass = getBaseStat("itemtypes", item.itemType, "class");
 			if (forClass >= 0 && forClass <= 6 && forClass !== me.classid) {
-				print('Item is for another class as me');
 				return false;
 			}
 
-			const currentItem = me.getItemsEx()
-				.filter(item => item.location === sdk.storage.Equipment && item.bodylocation === bodyLoc)
-				.first();
-
 			let dependencies = {};
-			const bow = sdk.itemtype.bow;
-			const crossbow = sdk.itemtype.crossbow;
-			dependencies[bow] = sdk.items.arrows;
-			dependencies[crossbow] = sdk.items.bolts;
+			dependencies[sdk.itemtype.bow] = sdk.items.arrows;
+			dependencies[sdk.items.arrows] = sdk.itemtype.bow;
+			dependencies[sdk.itemtype.crossbow] = sdk.items.bolts;
+			dependencies[sdk.items.bolts] = sdk.itemtype.crossbow;
 			let dependency = dependencies[item.itemType];
 			if (dependency) {
-				print("Item has a dependency, skip");
 				// TODO: item require an other item to be used (bow, crossbow)
+				print("Item has dependency, skip");
 				return false;
 				//quantity * 100 / getBaseStat("items", quiver.classid, "maxstack")
 				/*const stock = me.getItemsEx()
@@ -307,56 +330,70 @@
 				return -1;*/
 			}
 
+			const currentItem = me.getItemsEx()
+				.filter(item => item.location === sdk.storage.Equipment && item.bodylocation === bodyLoc)
+				.first();
+
 			// This item's specs are already fully readable
 			if (item.identified && currentItem) {
-				print('items specs are fully readable -- ' + item.name);
 				if (compare(currentItem, item) === item) {
-					print('We seem to prefer this item, over ' + currentItem.name + ' will be replaced with ' + item.name);
 					return true;
 				} else {
-					print('Current item is better, skip');
 					return false;
 				}
-			}
-			if (!item.identified) { // Tell the network we need to identify it first
-				return -1; // We want to identify this
 			}
 			return !!item.getBodyLoc(); // for now, we want all items that we can equip
 		}).call();
 	};
 
 	AutoEquip.handle = function (item) {
-		print('Handle item?');
+		print("AutoEquip handle "+item.name);
 		function dealWithIt(item) {
 			item.__wanted__by_AutoEquip = (function () {
 				const tier = formula(item);
 				print('DEALING WITH IT -- ' + item.name + '. Tier ' + tier);
-				const bodyLoc = item.getBodyLoc().first(); // ToDo Deal with multiple slots, like rings
-				const currentItem = me.getItemsEx()
-					.filter(item => item.location === sdk.storage.Equipment && item.bodylocation === bodyLoc)
-					.first();
 
-				// No current item? Im pretty sure we want to equip it then
-				if (!currentItem) return item.bodylocation === bodyLoc;
-
-				// Is the current item better as the new item?
-				if (compare(item, currentItem) !== item) return false; // No need to replace
-
-				// Is the new item better as the old item?
-				const old = item.equip(bodyLoc);
+				let bodyLocs = item.getBodyLoc();
+				let currentSlots = bodyLocs.map(l => ({location: l, item: me.getItemsEx()
+					.filter(item => item.location === sdk.storage.Equipment && item.bodylocation === l).first()}))
+					.sort((a, b) => {
+						if (!a.item) {
+							return -1;
+						}
+						if (!b.item) {
+							return 1;
+						}
+						return compare(a.item, b.item) === a.item ? 1 : -1
+					});
+				// currentSlots sorted by formula ascending (index 0 is worse than index 1)
+				let emptySlot = currentSlots.filter(s => !s.item).first();
+				let old;
+				if (emptySlot) {
+					old = item.equip(emptySlot.location);
+				}
+				else {
+					for (var i = 0; i < currentSlots.length && !old; i++) {
+						if (compare(currentSlots[i].item, item) === item) {
+							old = item.equip(currentSlots[i].location);
+						}
+					}
+				}
 
 				// Sometimes it happens the OLD item seems better once we have the new one in place
-				const newTier = old && old.unequiped && formula(old.unequiped.first()) || 0;
-
 				// Was the old item better?
-				if (newTier > tier) return !!old.rollback(); // Rollback and return false
+				if (old && old.unequiped) {
+					const newTier = formula(old.unequiped.first());
+					if (newTier > tier) {
+						let res = !!old.rollback();
+						return res; // Rollback and return false
+					}
+				}
 
 				return true;
 			}).call()
 		}
 
 		function identify(gid) {
-			print('identifing');
 			let returnTo = {area: me.area, x: me.x, y: me.y};
 			// We can id right now. So lets
 			const item = getUnits(4, -1, -1, gid).first();
@@ -370,23 +407,22 @@
 			if (!idTool || (tome && tome.getStat(sdk.stats.Quantity) == 0)) { // Dont have a scroll or tome, or is empty
 
 				//ToDo; go to cain if he is closer by and we dont have scrolls & nothing else to identify
-
 				if (!Town.goToTown(me.act, false, false)) {
+					print("unable to go to town");
 					return false;
 				}
 				// Lets go to town to identify
-				const npc = Town.initNPC("Shop", "identify");
+				const npc = Town.initNPC("Shop", "buyIdScroll");
 				scroll = npc.getItem(sdk.items.idScroll);
 				if (!scroll.buy()) {
+					print("unable to buy an id scroll");
 					me.cancel();
 					//TODO: can't buy scroll, try to identify items and sell to buy a scroll
 					if (returnTo.area !== me.area) {
 						if (!Town.move('portalspot')) {
-							print("Failed to move to portalspot");
 							throw new Error("Unable to go back to area "+returnTo.area);
 						}
 						if (!Pather.usePortal(returnTo.area, null)) {
-							print("Failed to use portal")
 							throw new Error("Unable to go back to area "+returnTo.area);
 						}
 						Pather.moveTo(returnTo.x, returnTo.y);
@@ -405,6 +441,7 @@
 				 i < 3 && getCursorType() !== 6;
 				 i++, timer = getTickCount()
 			) {
+				//print("using idTool to identify attempt #"+(i+1));
 				sendPacket(1, 0x27, 4, gid, 4, idTool.gid);
 				while (getCursorType() !== 6) {
 					delay(3);
@@ -412,13 +449,13 @@
 				}
 			}
 
-			print('Identified cursor? ' + (getCursorType() === 6));
+			//print('Identified cursor ? ' + (getCursorType() === 6));
 			// Try to id the item, 3 attempts
 			for (let i = 0, timer = getTickCount();
 				 i < 3 && !item.identified;
 				 i++, timer = getTickCount()
 			) {
-				print('send packet of identifing');
+				//print("send packet of identifing attempt #"+(i+1));
 				getCursorType() === 6 && sendPacket(1, 0x27, 4, gid, 4, idTool.gid);
 				while (!item.identified) {
 					delay(3);
@@ -428,32 +465,36 @@
 
 
 			let failed;
-			if ((failed = !(item.identified && dealWithIt(item)))) item.__wanted__by_AutoEquip = false; // Somehow failed, give up
+			if ((failed = !item.identified)) {
+				item.__wanted__by_AutoEquip = false; // Somehow failed, give up
+				print("failed to identify item");
+			}
 
 			if (returnTo.area !== me.area) {
 				if (!Town.move('portalspot')) {
-					print("Failed to move to portalspot");
 					throw new Error("Unable to go back to area "+returnTo.area);
 				}
 				if (!Pather.usePortal(returnTo.area, null)) {
-					print("Failed to use portal")
 					throw new Error("Unable to go back to area "+returnTo.area);
 				}
 				Pather.moveTo(returnTo.x, returnTo.y);
 			}
 
+			//print("identify res = "+(!failed));
 			return !failed;
 		}
 
 		if (!item.identified && item.location === sdk.storage.Inventory) {
-			const gid = item.gid;
-
-			print('identify?');
-			// if we are in town, we can identify
-			identify(gid); // So lets
+			identify(item.gid);
 		}
 
-		return item.identified && dealWithIt(item);
+		let id = item.identified;
+		let deal = dealWithIt(item);
+		let res = id && deal;
+		//print("handle item identified = "+id);
+		//print("handle dealWithIt = "+deal);
+		//print("handle res = "+res);
+		return res;
 	};
 
 	AutoEquip.id = 'AutoEquip';

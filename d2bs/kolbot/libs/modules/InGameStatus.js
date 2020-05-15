@@ -49,7 +49,7 @@
 				'Area: ' + getLocaleString(LocaleStrings[me.area]),
 				// Time: 01:31
 				'Time: ' + timer(),
-				'Script: ' + Loader.scriptList[Loader.scriptIndex],
+				'Script: ' + Loader.scriptList.length ? Loader.scriptList[Loader.scriptIndex] : 'None',
 				// Gold: 1523343
 				'Gold: ' + me.getStat(sdk.stats.Gold),
 				// Hell

@@ -156,14 +156,13 @@
 		return true;
 	};
 
-	Attack.clearLevelWalk = function (spectype) {
+	Attack.clearLevelWalk = function (spectype, stop) {
 		const Graph = require('Graph');
-
 		let graph = new Graph();
-		Graph.depthFirstSearch(graph, room => {
+		Graph.nearestNeighbourSearch(graph, room => {
 			Pather.moveTo(room.walkableX, room.walkableY, 3, true);
-			Attack.clear(room.xsize, spectype || 0);
-		});
+			Attack.clear(room.xsize*0.707, spectype || 0);
+		}, stop);
 	};
 
 	Attack.kill = function (classId) {

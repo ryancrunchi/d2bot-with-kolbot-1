@@ -219,7 +219,7 @@
 		AreaData[i] = ({
 			Super: SUPER[index],
 			Index: index,
-			Act: getBaseStat('levels', index, 'Act'),
+			Act: getBaseStat('levels', index, 'Act')+1,
 			MonsterDensity: getBaseStat('levels', index, ['MonDen', 'MonDen(N)', 'MonDen(H)'][me.diff]),
 			ChampionPacks: ({
 				Min: getBaseStat('levels', index, ['MonUMin', 'MonUMin(N)', 'MonUMin(H)'][me.diff]),

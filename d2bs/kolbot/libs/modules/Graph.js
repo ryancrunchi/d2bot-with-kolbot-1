@@ -126,9 +126,14 @@
 		
 	};
 
-	Graph.nearestNeighbourSearch = function(graph, explore) {
+	Graph.nearestNeighbourSearch = function(graph, explore, stopFunction) {
 		var currentVertex = graph.vertices.filter(v => !v.seen).first();
-		while (currentVertex) {
+		var stop = stopFunction;
+		print(typeof stop);
+		if (typeof stop !== "function") {
+			stop = () => false;
+		}
+		while (currentVertex && !stop()) {
 			GraphDebug.removeHookForRoom(currentVertex);
 			GraphDebug.drawRoom(currentVertex);
 			explore(currentVertex);
@@ -153,11 +158,15 @@
 
 	// DFS implementation
 	// exploreFunction is a function called for every explored vertex in the graph that takes a vertex as parameter
-	Graph.depthFirstSearch = function(graph, exploreFunction) {
+	Graph.depthFirstSearch = function(graph, exploreFunction, stopFunction) {
 		var stack = [];
 		var startVertex = graph.vertices.first();
 		stack.push(startVertex);
-		while (stack.length) {
+		var stop = stopFunction;
+		if (typeof stop != "function") {
+			stop = () => false;
+		}
+		while (stack.length && !stop()) {
 			let vertex = stack.pop();
 			if (!vertex.seen) {
 				exploreFunction(vertex);
@@ -174,11 +183,15 @@
 
 	// BFS implementation
 	// exploreFunction is a function called for every explored vertex in the graph that takes a vertex as parameter
-	Graph.breadthFirstSearch = function(graph, exploreFunction) {
+	Graph.breadthFirstSearch = function(graph, exploreFunction, stopFunction) {
 		var queue = [];
 		var startVertex = graph.vertices.first();
 		queue.push(startVertex);
-		while (queue.length) {
+		var stop = stopFunction;
+		if (typeof stop != "function") {
+			stop = () => false;
+		}
+		while (queue.length && !stop()) {
 			let vertex = queue.shift();
 			var neighbors = graph.nearbyVertices(vertex).filter(v => !v.seen);
 			for (var i = 0; i < neighbors.length; i++) {

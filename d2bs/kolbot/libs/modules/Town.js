@@ -73,19 +73,19 @@
 
 		Town.heal();
 		Town.identify();
-		Town.fillTome(518);
-
-		if (Config.FieldID) {
-			Town.fillTome(519);
-		}
+		// clear any leftover items
+		Town.clearInventory();
+		Town.fillTome(sdk.items.tptome);
+		Town.fillTome(sdk.items.idtome);
 
 		Town.buyPotions();
 		Town.buyKeys();
 		Town.shopItems();
-		Town.clearInventory();
 		Town.repair(repair);
 		Town.reviveMerc();
 		Town.gamble();
+		// clear again after shop
+		Town.clearInventory();
 		Town.stash(true);
 
 		for (i = 0; i < cancelFlags.length; i += 1) {
@@ -457,8 +457,8 @@
 
 		delay(500);
 		const Storage = require('Storage');
-		if (code === 518 && !me.findItem(518, 0, 3)) {
-			tome = npc.getItem(518);
+		if (!me.findItem(code, 0, 3)) {
+			tome = npc.getItem(code);
 
 			if (tome && Storage.Inventory.CanFit(tome)) {
 				try {
@@ -498,7 +498,7 @@
 			switch (id) {
 				case 519:
 				case "ibk":
-					return 20; // Ignore missing ID tome
+					return 0;
 				case 518:
 				case "tbk":
 					return 0; // Force TP tome check
@@ -740,8 +740,12 @@
 			item = list.shift();
 			result = Pickit.checkItem(item);
 
+			if (result.result == 0) {
+
+			}
+
 			// Force ID for unid items matching autoEquip criteria
-			if (result.result === 1 && !item.getFlag(0x10)) {
+			if (result.result === 1 && !item.identified) {
 				result.result = -1;
 			}
 
@@ -1720,32 +1724,51 @@
 		const Storage = require('Storage');
 
 		me.getItemsEx()
-			.filter(i => i.location == sdk.storage.Belt && [sdk.itemtype.hppot, sdk.itemtype.mppot, sdk.itemtype.rvpot].indexOf(i.itemType) > -1 && !i.code.startsWith(Config.BeltColumn[i.x % 4]))
-			.forEach((p, i) => {
+			.filter(p => p.location == sdk.storage.Belt && [sdk.itemtype.hppot, sdk.itemtype.mppot, sdk.itemtype.rvpot].indexOf(p.itemType) > -1 && !p.code.startsWith(Config.BeltColumn[p.x % 4]))
+			.forEach((p, _) => {
 				var countInInventory = me.getItemsEx()
-					.filter(i => i.location == sdk.storage.Inventory && i.itemType == p.itemType)
+					.filter(pp => pp.location == sdk.storage.Inventory && pp.itemType == p.itemType)
 					.length;
-				switch(p.itemType) {
-					case sdk.itemtype.hppot:
-						if (countInInventory >= Config.HPBuffer || !Storage.Inventory.MoveTo(p)) {
-							print("Unable to move potion to inventory for buffer");
-							p.sellOrDrop();
-						}
-						break;
 
-					case sdk.itemtype.mppot:
-						if (countInInventory >= Config.MPBuffer || !Storage.Inventory.MoveTo(p)) {
-							print("Unable to move potion to inventory for buffer");
-							p.sellOrDrop();
+				let beltSize = Storage.BeltSize();
+				var moved = false;
+				for (var i = 0; i < 4 && !moved; i += 1) {
+					let freeSpace = Town.checkColumns(beltSize);
+					if (p.code.indexOf(Config.BeltColumn[i]) > -1 && freeSpace[i] > 0) {
+						// Pick up the potion and put it in the good column
+						if (p.toCursor()) {
+							clickItem(sdk.clicktypes.click.Left, i, 0, sdk.storage.Belt);
 						}
-						break;
+						delay(me.ping + 200);
+						if (p.code.startsWith(Config.BeltColumn[p.x % 4])) {
+							moved = true;
+						}
+					}
+				}
 
-					case sdk.itemtype.rvpot:
-						if (countInInventory >= Config.RejuvBuffer || !Storage.Inventory.MoveTo(p)) {
-							print("Unable to move potion to inventory for buffer");
-							p.sellOrDrop();
-						}
-						break;
+				if (!moved) {
+					switch(p.itemType) {
+						case sdk.itemtype.hppot:
+							if (countInInventory >= Config.HPBuffer || !Storage.Inventory.MoveTo(p)) {
+								print("Unable to move potion");
+								p.sellOrDrop();
+							}
+							break;
+
+						case sdk.itemtype.mppot:
+							if (countInInventory >= Config.MPBuffer || !Storage.Inventory.MoveTo(p)) {
+								print("Unable to move potion");
+								p.sellOrDrop();
+							}
+							break;
+
+						case sdk.itemtype.rvpot:
+							if (countInInventory >= Config.RejuvBuffer || !Storage.Inventory.MoveTo(p)) {
+								print("Unable to move potion");
+								p.sellOrDrop();
+							}
+							break;
+					}
 				}
 			});
 

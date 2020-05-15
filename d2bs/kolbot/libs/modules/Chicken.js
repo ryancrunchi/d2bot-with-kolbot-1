@@ -75,6 +75,27 @@
 		var prevHP = me.hp;
 		var prevHPPercent = me.hp/me.hpmax*100;
 
+		const evalPotion = function (p, hp, lifePerSecPercent) {
+			var res = 0;
+			var factor = 1;
+			if ([sdk.items.RejuvPotion, sdk.items.FullRejuvPotion].indexOf(p.classid)) {
+				// the less life you have, the more efficient is a rejuv potion
+				res += hp;
+			}
+			// disance to fully refill, taking into account loosing/gaining life (lifePerSec)
+			var distanceToFull = p.diffToFull + lifePerSecPercent * p.duration;
+			if (distanceToFull < 0) {
+				// the potion effect is not high enough to refill to 100%
+				// missing <distanceToFull>% to get to 100%
+			}
+			else {
+				// the potion effect is <distanceToFull>% over refilling
+				// aka, <distanceToFull>% of potion effect will be used for nothing
+			}
+			res += (distanceToFull == 0 ? 1 : distanceToFull);
+			return 1/(res*factor);
+		};
+
 		// As we run now in our own thread, we can safely listen to packets. So lets
 		addEventListener('gamepacket', function (bytes) {
 			try {
@@ -115,27 +136,6 @@
 				let diffPerSec = hpDiff * 1000 / delay;
 				let lifePerSecPercent = diffPerSec / me.hpmax * 100;
 
-				function evalPotion (p) {
-					var res = 0;
-					var factor = 1;
-					if ([sdk.items.RejuvPotion, sdk.items.FullRejuvPotion].indexOf(p.classid)) {
-						// the less life you have, the more efficient is a rejuv potion
-						res += procentHP;
-					}
-					// disance to fully refill, taking into account loosing/gaining life (lifePerSec)
-					var distanceToFull = p.diffToFull + lifePerSecPercent * p.duration;
-					if (distanceToFull < 0) {
-						// the potion effect is not high enough to refill to 100%
-						// missing <distanceToFull>% to get to 100%
-					}
-					else {
-						// the potion effect is <distanceToFull>% over refilling
-						// aka, <distanceToFull>% of potion effect will be used for nothing
-					}
-					res += (distanceToFull == 0 ? 1 : distanceToFull);
-					return 1/(res*factor);
-				}
-
 				let hppots = me.getItemsEx()
 					.filter(filterItemsWithMe)
 					.filter(filterHealthPots)
@@ -143,7 +143,7 @@
 						p.effectPercent = GameData.potionEffect(p.classid) / me.hpmax * 100;
 						p.duration = GameData.Potions[p.classid].duration;
 						p.diffToFull = procentHP+p.effectPercent-100;
-						p.score = evalPotion(p);
+						p.score = evalPotion(p, procentHP, lifePerSecPercent);
 						return p;
 					})
 					//.filter(p => p.diffToFull <= 20)
@@ -160,7 +160,7 @@
 				let potentialAvgDmgTaken = monstersAround
 					.reduce((total, m) => total + m.avgDmg, 0);
 				let potentialDmgTakenPercent = potentialAvgDmgTaken / me.hpmax * 100;
-				let chicken = (hpDiff < 0 || hppots.length == 0) && potentialDmgTakenPercent >= procentHP;
+				let chicken = realValues.LifeChicken > 0 && (hpDiff < 0 || hppots.length == 0) && potentialDmgTakenPercent >= procentHP;
 				if (chicken) { // First check chicken on HP. After that mana.
 					print('Chicken');
 					quit(); // Quitting
