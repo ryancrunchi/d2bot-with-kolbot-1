@@ -4,8 +4,8 @@
  */
 (function (module, require) {
 	// Should be an module
-	const Config = require('Config');
-	const Auto = {}, Skills = require('Skills');
+	const Config = require('../modules/Config');
+	const Auto = {}, Skills = require('../modules/Skills');
 	Object.defineProperties(Auto, {
 		Config: {
 			get: function () {
@@ -40,9 +40,9 @@
 	};
 
 	AutoConfig.Chicken = function () {
-		require('Chicken'); // Load the chicken
-		Config.HealHP = 90;
-		Config.HealMP = 90;
+		require('../modules/Chicken'); // Load the chicken
+		Config.HealHP = 50;
+		Config.HealMP = 50;
 		Config.HealStatus = false;
 		Config.UseMerc = true;
 		Config.AvoidDolls = ([0, 1, 2, 6].indexOf(me.classid)); // Avoid dolls in case your a Ama / Sorc / Necro or Assa
@@ -73,7 +73,7 @@
 		Config.CainID.Enable = me.act === 4; // Only if we start in act4. Its quicker, otherwise it ain't.
 		Config.CainID.MinGold = 2500000;
 		Config.CainID.MinUnids = 3;
-		Config.FieldID = true; //ToDo; if we have a tomb
+		Config.FieldID = false; //ToDo; if we have a tomb
 		Config.DroppedItemsAnnounce.Enable = false;
 		Config.DroppedItemsAnnounce.Quality = [];
 	};
@@ -91,7 +91,7 @@
 			// Create a promise, once we can read a merc resolve with the merc object
 			// Once we have the merc, determin if it has Infinity, ifso, we definitely want to resurrect the merc during battle
 			print('need to watch merc?');
-			getScript(true).name.toLowerCase() === 'default.dbj' && new (require('Promise'))(function (resolve, reject) {
+			getScript(true).name.toLowerCase() === 'default.dbj' && new (require('../modules/Promise'))(function (resolve, reject) {
 				const merc = me.getMerc();
 				merc && typeof merc === 'object' && merc.hasOwnProperty('getItemsEx') && resolve();
 			})
@@ -114,9 +114,13 @@
 
 	//ToDo; Do something with this. For now 4 rows of rv pots to avoid belt clearance
 	AutoConfig.Belt = function () {
-		let [b, m] = [Config.BeltColumn, Config.MinColumn];
-		for (let i = 0; i < 4; i++) (b[i] = i === 0 && 'hp' || i === 1 && 'mp' || 'rv') && (m[i] = b[i] !== 'rv' && 3 || 0);
-		[Config.BeltColumn, Config.MinColumn] = [b, m];
+		if (me.charlvl === 1) {
+			Config.BeltColumn = ['hp','hp','hp','hp'];
+		} else {
+			let [b, m] = [Config.BeltColumn, Config.MinColumn];
+			for (let i = 0; i < 4; i++) (b[i] = i === 0 && 'hp' || i === 1 && 'mp' || 'rv') && (m[i] = b[i] !== 'rv' && 3 || 0);
+			[Config.BeltColumn, Config.MinColumn] = [b, m];
+		}
 	};
 
 
@@ -126,16 +130,16 @@
 		switch (true) {
 			// Almost all sorcs are the same, just setup a sorc
 			case me.classid === 1: //sorc
-				require('Sorceress'); // Use more telekenis and such
+				require('../modules/Sorceress'); // Use more telekenis and such
 				break;
 
 			case me.classid === 5: // Druid
 				break;
 			case me.classid === 2: // Pala
-				require('Paladin');
+				require('../modules/Paladin');
 				break;
 			case me.classid === 6:
-				require('Assassin');
+				require('../modules/Assassin');
 				break;
 
 		}

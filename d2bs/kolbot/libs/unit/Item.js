@@ -1,15 +1,17 @@
 Unit.prototype.equip = function (destLocation = undefined) {
-	const Storage = require('Storage');
+	const Storage = require('../modules/Storage');
 	let spot;
 	const doubleHanded = [26, 27, 34, 35, 67, 85, 86],
 		findspot = function (item) {
-			let tempspot = Storage.Stash.FindSpot(item);
-
-			if (getUIFlag(0x19) && tempspot) {
+			let tempspot;
+			if (getUIFlag(0x19) && Storage.Stash.CanFit(item)) {
+				tempspot = Storage.Stash.FindSpot(item);
 				return {location: Storage.Stash.location, coord: tempspot};
 			}
 
-			tempspot = Storage.Inventory.FindSpot(item);
+			if (Storage.Inventory.CanFit(item)) {
+				tempspot = Storage.Inventory.FindSpot(item);
+			}
 
 			if (tempspot) {
 				return {location: Storage.Inventory.location, coord: tempspot};
@@ -68,7 +70,7 @@ Unit.prototype.equip = function (destLocation = undefined) {
 			if (index === (currentEquiped.length - 1)) {
 				print('swap ' + this.name + ' for ' + item.name);
 				D2Bot.printToConsole('Swapping item ' + this.name + ' for ' + item.name);
-				require('Config').Debug && D2Bot.printToConsole('New\r\n' + this.description + '\r\n -- Old\r\n' + item.description);
+				require('../modules/Config').Debug && D2Bot.printToConsole('New\r\n' + this.description + '\r\n -- Old\r\n' + item.description);
 				let oldLoc = {x: this.x, y: this.y, location: this.location};
 				clickItemAndWait(0, this); // Pick up current item
 				clickItemAndWait(0, destLocation.first()); // the swap of items
@@ -120,12 +122,16 @@ Unit.prototype.getBodyLoc = function () {
 		8: [19], // belt
 		9: [15], // boots
 		10: [16], // gloves
+		/*[sdk.body.RightArmSecondary]: [], // secondary right
+		[sdk.body.LeftArmSecondary]: [], // secondary left*/
 	}, bodyLoc = [];
 
 	for (let i in types) {
 		this.itemType && types[i].indexOf(this.itemType) !== -1 && bodyLoc.push(i);
+		if (i === sdk.body.RightArm && this.twoHanded) {
+			bodyLoc.push(sdk.body.LeftArm); // two handed weapons take both solts
+		}
 	}
-
 	return bodyLoc.map(loc => parseInt(loc));
 };
 
@@ -133,7 +139,25 @@ Object.defineProperties(Unit.prototype, {
 	identified: {
 		get: function () {
 			if (this.type !== sdk.unittype.Item) return undefined; // Can't tell, as it isn't an item
-			return this.getFlag(0x10);
+
+			return this.getFlag(0x10); // is also true for white items
+		}
+	},
+	ethereal: {
+		get: function () {
+			if (this.type !== sdk.unittype.Item) return undefined; // Can't tell, as it isn't an item
+			return this.getFlag(0x400000);
+		}
+	},
+	twoHanded: {
+		get: function () {
+			return getBaseStat("items", this.classid, "2handed") === 1;
+		}
+	},
+	isEquipped: {
+		get: function () {
+			if (this.type !== sdk.unittype.Item) return false;
+			return this.location === sdk.storage.Equipment;
 		}
 	},
 	ethereal: {
@@ -157,8 +181,8 @@ Object.defineProperties(Unit.prototype, {
 
 // You MUST use a delay after Unit.sell() if using custom scripts. delay(500) works best, dynamic delay is used when identifying/selling (500 - item id time)
 Unit.prototype.sell = function () {
-	const Config = require('Config');
-	const Packet = require('PacketHelpers');
+	const Config = require('../modules/Config');
+	const Packet = require('../modules/PacketHelpers');
 	if (Config.PacketShopping) {
 		return Packet.sellItem(this);
 	}
@@ -193,8 +217,13 @@ Unit.prototype.sell = function () {
 	return false;
 };
 
+Unit.prototype.pick = function () {
+	const Pickit = require('../modules/Pickit');
+	this.type === 4 && Pickit.pickItem(this);
+};
+
 Unit.prototype.toCursor = function () {
-	const Town = require('Town');
+	const Town = require('../modules/Town');
 	if (this.type !== 4) {
 		throw new Error("Unit.toCursor: Must be used with items.");
 	}
@@ -243,6 +272,10 @@ Unit.prototype.toCursor = function () {
 Unit.prototype.drop = function () {
 	if (this.type !== 4) {
 		throw new Error("Unit.drop: Must be used with items.");
+	}
+
+	if (getInteractedNPC()) {
+		return false;
 	}
 
 	var i, tick, timeout;
@@ -372,7 +405,6 @@ Unit.prototype.getSuffix = function (id) {
 };
 
 
-
 Object.defineProperty(Unit.prototype, "dexreq", {
 	get: function () {
 		var finalReq,
@@ -428,6 +460,13 @@ Object.defineProperty(Unit.prototype, 'itemclass', {
 	enumerable: true
 });
 
+Object.defineProperty(Unit.prototype, 'charclass', {
+	get: function () {
+		return getBaseStat("itemtypes", this.itemType, "class");
+	},
+	enumerable: true
+});
+
 
 /**
  * @description Return the items of a player, or an empty array
@@ -460,7 +499,7 @@ Unit.prototype.sellOrDrop = function (log = false) {
 };
 
 Object.defineProperty(Unit.prototype, "skinCode", {
-	get: function() {
+	get: function () {
 		var code;
 		if (this.getFlag(0x10)) {
 			switch (this.quality) {

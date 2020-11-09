@@ -1,7 +1,7 @@
 /** @typedef {Unit} me */
 
 (function () {
-	const Events = new (require('Events'));
+	const Events = new (require('../modules/Events'));
 	me.switchWeapons = function (slot) {
 		if (this.gametype === 0 || this.weaponswitch === slot && slot !== undefined) {
 			return true;
@@ -65,7 +65,7 @@
 	Object.defineProperties(me, {
 		primarySlot: {
 			get: function () {
-				const Config = require('Config');
+				const Config = require('../modules/Config');
 				return Config.PrimarySlot !== undefined ? Config.PrimarySlot : 0;
 			},
 			enumerable: false,
@@ -84,7 +84,7 @@
 			get: function () {
 				var bonusReduction = me.getStat(28);
 				var armorMalusReduction = 0; // TODO:
-				return 25 * Math.max(40 * (1 + armorMalusReduction/10) * (100-bonusReduction) / 100, 1) / 256;
+				return 25 * Math.max(40 * (1 + armorMalusReduction / 10) * (100 - bonusReduction) / 100, 1) / 256;
 			}
 		},
 		staminaTimeLeft: { // seconds before I run out of stamina (assuming we are running)
@@ -99,8 +99,17 @@
 		},
 		highestAct: {
 			get: function () {
-				return [true, me.getQuest(7, 0), me.getQuest(15, 0), me.getQuest(23, 0), me.getQuest(28, 0)]
-					.findIndex(i => !i);
+				let i = 1, acts = [sdk.quests.AbleToGotoActII,
+					sdk.quests.AbleToGotoActIII,
+					sdk.quests.AbleToGotoActIV,
+					sdk.quests.AbleToGotoActV,
+				];
+
+				while (acts.length && me.getQuest(acts.shift(), 0)) {
+					i++;
+				}
+				return i;
+
 			}
 		},
 		highestQuestDone: {
@@ -187,19 +196,19 @@
 	});
 
 	me.journeyToPreset = function (area, unitType, unitId, offX, offY, clearPath, pop) {
-		const Pather = require('Pather');
+		const Pather = require('../modules/Pather');
 		if (me.area !== area) Pather.journeyTo(area, clearPath);
 
 		return Pather.moveToPreset(area, unitType, unitId, offX, offY, clearPath, pop);
 	};
 	me.useWaypoint = function (targetArea) {
-		const Pather = require('Pather');
+		const Pather = require('../modules/Pather');
 		Pather.useWaypoint(targetArea);
 		return this;
 	};
 
 	me.emptyCube = function () {
-		const Storage = require('Storage');
+		const Storage = require('../modules/Storage');
 		const cube = me.cube,
 			items = me.getItemsEx().filter(item => item.location === sdk.storage.Cube);
 
@@ -211,6 +220,7 @@
 	};
 
 	me.openCube = function () {
+		console.debug('Opening cube?');
 		let i, tick,
 			cube = me.cube;
 
@@ -218,8 +228,10 @@
 
 		if (getUIFlag(0x1a)) return true;
 
-		const Town = require('Town');
-		if (cube.location === 7 && !Town.openStash()) return false;
+		if (cube.location === 7) {
+			const Town = require('../modules/Town');
+			if (cube.location === 7 && !Town.openStash()) return false;
+		}
 
 		for (i = 0; i < 3; i += 1) {
 			cube.interact();
@@ -259,7 +271,6 @@
 		}
 		return false;
 	};
-
 
 
 	me.findItem = function (id, mode, loc, quality) {
@@ -327,10 +338,11 @@
 
 	// get the item classid from chestid. Usefull for items like inifuss with tree, act 2 staff and amulet with chests etc...
 	me.getQuestItem = function (classid, chestid) { // Accepts classid only or a classid/chestid combination.
-		const Storage = require('Storage'),
-			Pickit = require('Pickit'),
-			Misc = require('Misc'),
-			Town = require('Town');
+		const Storage = require('../modules/Storage'),
+			Pickit = require('../modules/Pickit'),
+			Town = require('../modules/Town'),
+			Misc = require('../modules/Misc');
+
 		var i, chest, item,
 			tick = getTickCount();
 
@@ -349,7 +361,7 @@
 			}
 		}
 
-		for (i = 0 ; i < 50 ; i += 1) { // Give the quest item plenty of time (up to two seconds) to drop because if it's not detected the function will end.
+		for (i = 0; i < 50; i += 1) { // Give the quest item plenty of time (up to two seconds) to drop because if it's not detected the function will end.
 			item = getUnit(4, classid);
 			if (item) {
 				break;
@@ -365,10 +377,10 @@
 					delay(me.ping * 2 + 500);
 				} else {
 					if (Pickit.canMakeRoom()) {
-						print("ÿc1Trying to make room for " + Pickit.itemColor(item) + item.name);
+						console.debug("ÿc1Trying to make room for " + Pickit.itemColor(item) + item.name);
 						Town.visitTown(); // Go to Town and do chores. Will throw an error if it fails to return from Town.
 					} else {
-						print("ÿc1Not enough room for " + Pickit.itemColor(item) + item.name);
+						console.debug("ÿc1Not enough room for " + Pickit.itemColor(item) + item.name);
 						return false;
 					}
 				}
@@ -380,22 +392,55 @@
 		return true;
 	};
 
+
+	// Credits to Jean Max for this function: https://github.com/JeanMax/AutoSmurf/blob/master/AutoSmurf.js#L1346
 	me.talkTo = (npc) => {
-		const NPC = require('NPC'),
-			Town = require('Town');
+		const NPC = require('../modules/NPC'),
+			Town = require('../modules/Town'),
+			Pather = require('../modules/Pather');
+
+
 		for (var i = 0; i < 5; i++) {
 			Town.move(npc === NPC.Jerhyn ? "palace" : npc);
 			var monkey = getUnit(sdk.unittype.NPC, npc === NPC.Cain ? "deckard cain" : npc);
-			if (monkey && monkey.openMenu() && me.cancel()) {
-				return true;
+			if (monkey && monkey.openMenu()) {
+				return monkey;
 			}
 			//Packet.flash(me.gid);
 			delay(me.ping * 2 + 500);
-			me.moveBy(rand(-5, 5), rand(-5, 5));
+			Pather.moveTo(me.x + rand(-5, 5), me.y + rand(-5, 5));
 		}
 
 		return false;
 	};
+
+	me.moveTo = function(...args) {
+		const Pather = require('../modules/Pather');
+		Pather.moveTo.apply(Pather, args)
+	};
+
+	me.getCube = () => {
+		const Misc = require('../modules/Misc');
+
+		me.journeyToPreset(sdk.areas.HallsOfDeadLvl3, 2, sdk.units.HoradricCubeChest);
+
+		const chest = getUnit(2, sdk.units.HoradricCubeChest);
+		if (chest) {
+			Misc.openChest(chest);
+		}
+
+		const cube = Misc.poll(() => getUnit(4, sdk.items.cube), 3000, 30);
+		cube && cube.pick();
+
+		return !!me.getItem(sdk.items.cube);
+	};
+
+	// me.openCube = () => {
+	// 	while (!getUIFlag(0x1A)) {
+	// 		sendPacket(1, 0x27, 4, me.findItem(-1, -1, me.findItems(-1, -1, 3) === false ? 1 : 3).gid, 4, me.getItem("box").gid);
+	// 		delay((me.ping || 0) * 2 + 200);
+	// 	}
+	// };
 
 	me.on = Events.on;
 	me.off = Events.off;

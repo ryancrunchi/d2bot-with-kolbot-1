@@ -12,17 +12,17 @@ include("OOG.js");
 
 include("sdk.js ");
 function main() {
-	let Experience = require('Experience');
-	var i, mercHP, ironGolem, tick, merc, Config = require('Config'),
+	let Experience = require('../libs/modules/Experience');
+	var i, mercHP, ironGolem, tick, merc, Config = require('../libs/modules/Config'),
 		debugInfo = {area: 0, currScript: "no entry"},
 		pingTimer = [],
 		quitFlag = false,
 		cloneWalked = false,
 		canQuit = true,
 		timerLastDrink = [];
-	const Misc = require('Misc');
-	const Town = require('Town');
-	const Pather = require('Pather');
+	const Misc = require('../libs/modules/Misc');
+	const Town = require('../libs/modules/Town');
+	const Pather = require('../libs/modules/Pather');
 
 	print("ÿc3Start ToolsThread script");
 	Config();
@@ -322,6 +322,7 @@ function main() {
 		return id || "";
 	};
 
+	let __nearestPresetLine;
 	// Event functions
 	this.keyEvent = function (key) {
 		switch (key) {
@@ -332,6 +333,10 @@ function main() {
 		case 123: // F12 key
 			me.overhead("Revealing " + Pather.getAreaName(me.area));
 			revealLevel(true);
+
+			console.debug(me.x+','+me.y);
+			copy('{x: '+me.x+',y: '+me.y+'}');
+
 
 			break;
 		case 107: // Numpad +
@@ -380,7 +385,7 @@ function main() {
 
 			break;
 		case 106: // numpad * - precast
-			require('Precast')();
+			require('../libs/modules/Precast')();
 
 			break;
 		}
@@ -498,8 +503,18 @@ function main() {
 	addEventListener("scriptmsg", this.scriptEvent);
 	//addEventListener("gamepacket", Events.gamePacket);
 
+	const Messaging = require('../libs/modules/Messaging');
+	let timer = getTickCount();
 	// Start
 	while (true) {
+
+		const def = getScript('default.dbj');
+		if (def && !def.running) {
+			if ((getTickCount() - timer) < 6000 || (timer = getTickCount()) && false) {
+				Messaging.send({Guard: {heartbeat: getTickCount()}});
+			}
+		}
+
 		try {
 			if (me.gameReady && !me.inTown) {
 				if (Config.IronGolemChicken > 0 && me.classid === 2) {

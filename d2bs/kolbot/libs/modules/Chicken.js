@@ -5,7 +5,7 @@
 
 
 (function (module, require, thread) {
-	const Messaging = require('Messaging');
+	const Messaging = require('../modules/Messaging');
 
 	const Config = require('Config');
 	const GameData = require('GameData');
@@ -211,7 +211,7 @@
 				}
 
 				// Take care of our sweet merc (rev pot)
-				if (merc && procentHPMerc < realValues.UseRejuvHP && tickRevMerc > 250) {
+				if (merc && procentHPMerc < realValues.UseRejuvHP && tickRevMerc > 500) {
 					let revPot = me.getItemsEx().filter(filterRevPots).filter(filterItemsWithMe).sort(sortBiggest).first();
 					if (revPot) {
 						clickItem(2, revPot);
@@ -223,7 +223,7 @@
 
 
 				// Take care of our sweet merc (hp pot)
-				if (merc && procentHPMerc < realValues.UseHP && tickHPMerc > 250) {
+				if (merc && procentHPMerc < realValues.UseHP && tickHPMerc > 2500) {
 					let hp = me.getItemsEx().filter(filterHPPots).filter(filterItemsWithMe).sort(sortBiggest).first();
 					if (hp) {
 						print('ÿc:Drank a ' + hp.name + ' Pot');
@@ -239,7 +239,7 @@
 			return false; // dont block the packet
 		});
 
-		const Worker = require('Worker');
+		const Worker = require('../modules/Worker');
 		Worker.runInBackground.DeathHandler = function() {
 			if (me.dead && realValues['QuitWhenDead']) {
 				print('Died.. Quitting');

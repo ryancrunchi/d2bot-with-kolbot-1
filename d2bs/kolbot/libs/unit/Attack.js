@@ -1,15 +1,11 @@
-(function (require, _delay) {
-	const Skills = require('Skills');
-	const Precast = require('Precast');
-	const GameData = require('GameData');
-	const Config = require('Config');
-	const Pickit = require('Pickit');
-	const Pather = require('Pather');
-	const ignoreMonster = [];
-
-	Unit.resetIgnored = () => {
-		ignoreMonster.length = 0;
-	};
+(function (module, require, _delay) {
+	const Skills = require('../modules/Skills');
+	const Precast = require('../modules/Precast');
+	const GameData = require('../modules/GameData');
+	const Config = require('../modules/Config');
+	const Pickit = require('../modules/Pickit');
+	const Pather = require('../modules/Pather');
+	global['__________ignoreMonster'] = [];
 
 	Unit.prototype.clear = function (range, spectype, walk = !Pather.useTeleport(), once = false) {
 		let start = [], startArea = me.area;
@@ -41,7 +37,7 @@
 		//ToDo; keep track of the place we are at
 		const getUnits_filtered = () => getUnits(1, -1)
 			.filter(unit =>
-				ignoreMonster.indexOf(unit.gid) === -1 // Dont attack those we ignore
+				global['__________ignoreMonster'].indexOf(unit.gid) === -1 // Dont attack those we ignore
 				&& unit.hp > 0 // Dont attack those that have no health (catapults and such)
 				&& unit.attackable // Dont attack those we cant attack
 				&& unit.area === me.area
@@ -166,7 +162,7 @@
 				}
 			}
 		};
-		const GameData = require('GameData');
+		const GameData = require('../modules/GameData');
 		if (Config.PacketCasting > 1 || forcePacket || (Config.PacketCasting && skillId === sdk.skills.Teleport)) {
 			if (this === me) {
 				sendPacket(1, (hand === 0) ? 0x0c : 0x05, 2, x, 2, y);
@@ -174,7 +170,7 @@
 				sendPacket(1, (hand === 0) ? 0x11 : 0x0a, 4, this.type, 4, this.gid);
 			}
 			ensureState();
-			delay(GameData.castingDuration(skillId)*1000);
+			delay(GameData.castingDuration(skillId) * 1000);
 			return this;
 		}
 
@@ -202,37 +198,37 @@
 		}
 
 		MainLoop:
-		for (n = 0; n < 3; n += 1) {
-			if (this !== me) {
-				clickMap(clickType, shift, this);
-			} else {
-				clickMap(clickType, shift, x, y);
-			}
-
-			delay(20);
-
-			if (this !== me) {
-				clickMap(clickType + 2, shift, this);
-			} else {
-				clickMap(clickType + 2, shift, x, y);
-			}
-
-			for (i = 0; i < 8; i += 1) {
-				if (me.attacking) {
-					break MainLoop;
+			for (n = 0; n < 3; n += 1) {
+				if (this !== me) {
+					clickMap(clickType, shift, this);
+				} else {
+					clickMap(clickType, shift, x, y);
 				}
 
 				delay(20);
+
+				if (this !== me) {
+					clickMap(clickType + 2, shift, this);
+				} else {
+					clickMap(clickType + 2, shift, x, y);
+				}
+
+				for (i = 0; i < 8; i += 1) {
+					if (me.attacking) {
+						break MainLoop;
+					}
+
+					delay(20);
+				}
 			}
-		}
 
 		//ToDo; Deal with ias, if it is an melee attack
-		delay(GameData.castingDuration(skillId)*1000);
+		delay(GameData.castingDuration(skillId) * 1000);
 
 		ensureState();
 		return this;
 	};
-	const Town = require('Town');
+	const Town = require('../modules/Town');
 	let check = getTickCount();
 	Unit.prototype.attack = function (maxDistance = 40) {
 		const monsterEffort = GameData.monsterEffort(this, this.area, undefined, undefined, undefined, true);
@@ -240,12 +236,12 @@
 		const move = (sk = populatedAttack.skill) => {
 			if (this.distance > Skills.range[sk] || checkCollision(me, this, 0x4) || this.distance > maxDistance) {
 				if (!this.getIntoPosition(Skills.range[sk] / 3 * 2, 0x4)) {
-					ignoreMonster.push(this.gid);
+					global['__________ignoreMonster'].push(this.gid);
 					return;
 				}
 			}
 			if (this.distance > maxDistance) { // Still on high distance?
-				ignoreMonster.push(this.gid);
+				global['__________ignoreMonster'].push(this.gid);
 			}
 		};
 
@@ -254,7 +250,7 @@
 
 		if (!this.validSpot) {
 			print('INVALID SPOT -- ');
-			ignoreMonster.push(this.gid);
+			global['__________ignoreMonster'].push(this.gid);
 			return false;
 		}
 		let corpse, range;
@@ -324,7 +320,7 @@
 				}
 
 				if (populatedAttack.skill === sdk.skills.BlessedHammer) {
-					if (!require('Paladin').getHammerPosition(this)) return false;
+					if (!require('../modules/Paladin').getHammerPosition(this)) return false;
 				}
 				break;
 			case me.classid === 6: // ToDO; make more viable on lower levels / fire assasin
@@ -411,7 +407,7 @@
 		print('Killing ' + this.name);
 		let counter = 1;
 		while (counter < 3000 && counter++ && this.attackable) if (!this.attack(maxDistance)) break;
-		this.attackable && ignoreMonster.push(this.gid);
+		this.attackable && global['__________ignoreMonster'].push(this.gid);
 	};
 
 	Unit.prototype.checkCorpse = function (revive) {
@@ -582,7 +578,7 @@
 
 			if (charge) {
 				// Setting skill on hand
-				const Config = require('Config');
+				const Config = require('../modules/Config');
 				if (!Config.PacketCasting || Config.PacketCasting === 1 && skillId !== sdk.skills.Teleport) {
 					return me.cast(skillId, 0, x || me.x, y || me.y, this); // Non packet casting
 				}
@@ -601,5 +597,28 @@
 		return false;
 	};
 
+	Unit.prototype.securePosition = function (range = 30, collision = 0x04, timer = 2000) {
+		let tick = 0;
+		do {
+			this.clear(35, false, undefined, undefined, () => {
+				let found = getUnits(1)
+					.filter(unit =>
+						global['__________ignoreMonster'].indexOf(unit.gid) === -1 // Dont attack those we ignore
+						&& unit.hp > 0 // Dont attack those that have no health (catapults and such)
+						&& unit.attackable // Dont attack those we cant attack
+						&& unit.area === me.area
+						&& !checkCollision(me, unit, collision)
+						&& getDistance(this.x, this.y, unit.x, unit.y) <= range
+					).sort((a, b) => b.distance - a.distance);
 
-})(require, delay);
+				if (found.length) {
+					// There is something to attack, aka it aint safe yet
+					tick = 0;
+				} else if (!found.length && !tick) {
+					tick = getTickCount();
+				}
+				return found;
+			}); // Clear around me
+		} while (!tick || getTickCount() - tick < timer)
+	};
+})(module, require, delay);

@@ -2417,6 +2417,8 @@ let sdk = {
         bolts: 528,
         tpScroll: 529,
         idScroll: 530,
+        arrows: 526,
+        bolts: 528
     },
     unittype: {
         Player: 0,

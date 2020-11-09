@@ -4,11 +4,11 @@
  */
 
 (function (module, require) {
-	const Pickit = require('Pickit');
-	const Promise = require('Promise');
-	const GameData = require('GameData');
-	const Town = require('Town');
-	const Pather = require('Pather');
+	const Pickit = require('./Pickit');
+	const Promise = require('./Promise');
+	const GameData = require('./GameData');
+	const Town = require('./Town');
+	const Pather = require('./Pather');
 
 	let bestSkills = [];
 	(function () {
@@ -36,8 +36,9 @@
 		calculateSkills();
 	}).call();
 
+	//ToDo: Need to tell the system if its for me or a merc?
+
 	function formula(item) {
-		// + item.getStatEx(sdk.stats.AddskillTab, 10) //ToDO; Fix tab skill we use the most ;)
 		const skills = () => {
 				let val = item.getStatEx(sdk.stats.Allskills) + item.getStatEx(sdk.stats.Addclassskills, me.classid);
 
@@ -88,6 +89,7 @@
 			fhr = () => item.getStatEx(sdk.stats.Fastergethitrate /* fhr*/),
 			frw = () => item.getStatEx(sdk.stats.Fastermovevelocity /* fwr*/),
 			ctb = () => item.getStatEx(sdk.stats.Toblock /*ctb = chance to block*/),
+			beltsize = () => !(item.code === "lbl" || item.code === "vbl") ? !(item.code === "mbl" || item.code === "tbl") ? 4 : 3 : 2,
 			ias = () => {
 				// This is a tricky one. A sorc, doesnt give a shit about IAS.
 				// 0='amazon',1='sorc',2='necro',3='paladin',4='barb',5='druid',6='assassin'
@@ -158,7 +160,7 @@
 			weapon: {
 				magic: () => (skills() * 10000
 					+ elementDmg() * 5000
-					+ res() * 1000
+					+ res() * 200
 					+ hpmp() * 100
 					+ strdex() * 10
 					+ fcr())
@@ -187,7 +189,7 @@
 					* eth(),
 			},
 
-			ring: {
+			_oldring: {
 				magic: () => (res() * 1000)
 					+ ((hpmp() + strdex()) * 100)
 					+ fcr(),
@@ -196,8 +198,15 @@
 					+ ((hpmp() + strdex()) * 1000),
 			},
 
+			ring: {
+				magic: () => (fcr() * 1000) + (res() * 10) + ((hpmp() + strdex()) * 100),
+
+				rare: () => (fcr() * 1000) + (res() * 10) + ((hpmp() + strdex()) * 100),
+			},
+
 			belt: {
 				magic: () => (res() * 10000
+					+ beltsize() * 10000
 					+ strdex() * 1000
 					+ hpmp() * 100
 					+ fhr() * 10
@@ -253,53 +262,87 @@
 			tierFuncs = Object.keys(tiers).map(key => tiers[key])[bodyLoc - 1];
 
 		if (tierFuncs === undefined) {
-			//print('klasdfjlkasdjflkasdjflkasdjflkasdjfkl --- ' + item.name);
-			//throw Error('Should not happen?');
+			// throw Error('Should not happen?');
 			return 0;
 		}
 		const [magicTier, rareTier] = [tierFuncs.magic, tierFuncs.rare];
 
+		let bias = 1;
+
+		// if eth
+		if (item.getFlag(0x400000)) {
+			bias += 0.10; // A fix'd negative point of 10%
+
+			// And increase this negativity scale for its state, so a nearly broken item will be quicker replaced with something better
+			bias += 1 - (1 / item.getStat(sdk.stats.Maxdurability) * item.getStat(sdk.stats.Durability));
+		}
+
 		if (isRuneword || item.quality >= sdk.itemquality.rare) {
 			if (typeof rareTier === 'function') {
 				let tier = rareTier();
-				print('TIER OF RARE -- ' + tier + ' -- ' + item.name);
+				// console.debug('rare tier -- '+item.name+ ' -- '+tier);
 				return tier;
 			}
-			print('Error? magicTier is not an function?');
 			return 0;
 		}
 		// magical, or lower
 		if (typeof magicTier === 'function') {
 			let tier = magicTier();
-			print('TIER OF MAGIC -- ' + tier + ' -- ' + item.name);
+			// console.debug('magic tier -- '+item.name+ ' -- '+tier);
 			return tier;
 		}
-		print('Error? magicTier is not an function?');
 		return 0;
 	}
 
+	// Sort by rating, and after that by location (by same rating, prefer an item that is already equipped)
+	const sortItems = (a, b) => {
+		let fa = formula(a);
+		let fb = formula(b);
+		if (fb === fa) {
+			return a.isEquipped ? -1 : 1;
+		}
+		return fb - fa;
+	};
+
 	/**
-	 * @description Returns the item that is best.
-	 * @param a
-	 * @param b
-	 */
-	const compare = (a, b) => formula(a) < formula(b) && b || a;
+	 * @param {Item[]} items
+	 * @returns Item[] */
+	const compareRetAll = (items) => items.sort(sortItems);
+
+	/** @returns Item */
+	const compare = (...args) => compareRetAll(args)
+		.first();
+
+	const dependencies = {};
+	dependencies[sdk.itemtype.bow] = sdk.items.arrows;
+	dependencies[sdk.items.arrows] = sdk.itemtype.bow;
+	dependencies[sdk.itemtype.crossbow] = sdk.items.bolts;
+	dependencies[sdk.items.bolts] = sdk.itemtype.crossbow;
+
+	const hasDependency = item => {
+		let dep = dependencies[item.classid] || dependencies[item.itemType];
+		return !!dep;
+	};
 
 	function AutoEquip() { // So we can call new upon it. Not sure why yet
 
 	}
 
-	require('Debug');
-
 	AutoEquip.want = function (item) {
 		return item.__wanted__by_AutoEquip = (function () {
+			if (!item) return false; // We dont want an item that doesnt exists
+
+			// fuck 2 handed items for now
+			if (item.twoHanded) return false;
+
+			// no quest items
+			if (['msf','vip'].includes(item.code)) return false;
+
 			// If we already excluded this item, lets not rerun this
 			if (item.hasOwnProperty('__wanted__by_AutoEquip') && !item.__wanted__by_AutoEquip) return false;
 
-			if (!item) return false; // We dont want an item that doesnt exists
-			const bodyLoc = item.getBodyLoc().first();
-
-			if (!bodyLoc) return false; // Only items that we can wear
+			const bodyLoc = item.getBodyLoc();
+			if (!bodyLoc.length) return false; // Only items that we can wear
 
 			if (!item.identified) { // Tell the network we need to identify it first
 				return -1; // We want to identify this
@@ -309,14 +352,8 @@
 			if (forClass >= 0 && forClass <= 6 && forClass !== me.classid) {
 				return false;
 			}
-
-			let dependencies = {};
-			dependencies[sdk.itemtype.bow] = sdk.items.arrows;
-			dependencies[sdk.items.arrows] = sdk.itemtype.bow;
-			dependencies[sdk.itemtype.crossbow] = sdk.items.bolts;
-			dependencies[sdk.items.bolts] = sdk.itemtype.crossbow;
-			let dependency = dependencies[item.itemType];
-			if (dependency) {
+			
+			if (hasDependency(item)) {
 				// TODO: item require an other item to be used (bow, crossbow)
 				print("Item has dependency, skip");
 				return false;
@@ -347,15 +384,26 @@
 	};
 
 	AutoEquip.handle = function (item) {
-		print("AutoEquip handle "+item.name);
-		function dealWithIt(item) {
+		const dealWithIt = item => {
 			item.__wanted__by_AutoEquip = (function () {
+				// console.debug('DEALING WITH IT -- ' + item.name + '. Tier ' + tier);
+				// We got it now, but somehow... dont want it anymore?
+				if (!AutoEquip.want(item)) {
+					return false;
+				}
+
 				const tier = formula(item);
-				print('DEALING WITH IT -- ' + item.name + '. Tier ' + tier);
 
 				let bodyLocs = item.getBodyLoc();
-				let currentSlots = bodyLocs.map(l => ({location: l, item: me.getItemsEx()
-					.filter(item => item.location === sdk.storage.Equipment && item.bodylocation === l).first()}))
+				let currentSlots = bodyLocs.map(loc => ({location: loc, item: me.getItemsEx()
+						.filter(item => {
+							if (item.twoHanded && item.getBodyLoc().includes(loc)) {
+								return item.isEquipped;
+							}
+							return item.isEquipped && item.bodylocation === loc;
+						})
+						.first()
+					}))
 					.sort((a, b) => {
 						if (!a.item) {
 							return -1;
@@ -365,6 +413,7 @@
 						}
 						return compare(a.item, b.item) === a.item ? 1 : -1
 					});
+				
 				// currentSlots sorted by formula ascending (index 0 is worse than index 1)
 				let emptySlot = currentSlots.filter(s => !s.item).first();
 				let old;
@@ -373,6 +422,7 @@
 				}
 				else {
 					for (var i = 0; i < currentSlots.length && !old; i++) {
+						// if item is better than current, equip it
 						if (compare(currentSlots[i].item, item) === item) {
 							old = item.equip(currentSlots[i].location);
 						}
@@ -381,19 +431,19 @@
 
 				// Sometimes it happens the OLD item seems better once we have the new one in place
 				// Was the old item better?
-				if (old && old.unequiped) {
+				if (old && old.unequiped && old.unequiped.length) {
 					const newTier = formula(old.unequiped.first());
 					if (newTier > tier) {
-						let res = !!old.rollback();
-						return res; // Rollback and return false
+						return !!old.rollback(); // Rollback and return
 					}
 				}
-
+				
 				return true;
 			}).call()
-		}
+		};
 
-		function identify(gid) {
+		const identify = gid => {
+			console.debug('identifing');
 			let returnTo = {area: me.area, x: me.x, y: me.y};
 			// We can id right now. So lets
 			const item = getUnits(4, -1, -1, gid).first();
@@ -449,7 +499,7 @@
 				}
 			}
 
-			//print('Identified cursor ? ' + (getCursorType() === 6));
+			console.debug('Identified cursor? ' + (getCursorType() === 6));
 			// Try to id the item, 3 attempts
 			for (let i = 0, timer = getTickCount();
 				 i < 3 && !item.identified;
@@ -462,7 +512,6 @@
 					if (getTickCount() - timer > 2e3) break; // Failed to id it. To bad
 				}
 			}
-
 
 			let failed;
 			if ((failed = !item.identified)) {
@@ -482,7 +531,7 @@
 
 			//print("identify res = "+(!failed));
 			return !failed;
-		}
+		};
 
 		if (!item.identified && item.location === sdk.storage.Inventory) {
 			identify(item.gid);
@@ -497,14 +546,70 @@
 		return res;
 	};
 
+	/**
+	 * @param {Item[]} items
+	 * @return Item
+	 */
+	AutoEquip.shop = function (items) {
+		console.debug('AutoEquip shopping for items');
+
+		// first an object that contains the items per bodylocation
+		return items.reduce((acc, item) => {
+			const bodyloc = item.getBodyLoc().first(); // rings are not for sale so who cares about multiple slots;
+
+			(acc[bodyloc] = acc[bodyloc] || []).push(item);
+
+			return acc;
+		}, new Array(sdk.body.LeftArmSecondary + 1))
+			// now this is an array per body location
+			.map((/**@type Item[]*/items, bodyloc) => {
+					/** @type Item*/
+					const currentItem = me.getItemsEx()
+						.filter(item => item.isEquipped && item.bodylocation === bodyloc)
+						.first();
+
+					const currentRating = !currentItem ? -Infinity : formula(currentItem);
+
+					// calculate the actual rating of this item
+					return items.map(item => {
+						let ratingThisItem = formula(item);
+						if (ratingThisItem < currentRating) return false;
+
+						// Avoid issues like dual handed items and such
+						if (!AutoEquip.want(item)) return false;
+
+						//ToDo; calculate formula for 2 handed weapons
+						return ({
+							item: item,
+							rating: ratingThisItem,
+							price: item.getItemCost(0), // 0 = to buy
+							currentRating: currentRating,
+						});
+
+					})
+						// filter out those that are worse as we got and those that we can afford
+						.filter(obj => {
+								return obj && currentRating < obj.rating && obj.price < me.gold;
+							} // Needs to be better
+							// && currentRating - obj.rating > obj.rating * 0.10  // needs to be atleast 10% better if we buy the item
+							// && obj.price < me.gold // can we afford it?
+						) //ToDo; proper gold handeling
+						.sort((a, b) => b.rating - a.rating) // higher is better
+						.first();
+				}
+			)
+			// filter out those options without a result
+			.filter(_ => !!_)
+			.sort((a, b) => (b.rating - b.currentRating) - (a.rating - a.currentRating))
+			.map(obj => obj.item);
+	};
+
 	AutoEquip.id = 'AutoEquip';
 	AutoEquip.formula = formula;
 
 	module.exports = AutoEquip;
 
 	// Inject ourselfs into the pickit handlers
-
 	Pickit.hooks.push(AutoEquip)
-
 })
 (module, require);

@@ -4,38 +4,25 @@
  *    @desc        Do quests, only most popular ones for now
  */
 
-(function (module, require) {
+function Questing(Config, Attack, Pickit, Pather, Town, Misc) {
+	const Precast = require('../modules/Precast');
+	const NPC = require('../modules/NPC');
+	let i, j,
+		quests = [
+			[1, "clearDen"],
+			[9, "killRadament"],
+			[17, "lamEssen"],
+			[25, "killIzual"],
+			[35, "killShenk"],
+			[37, "freeAnya"]
+		];
 
-	const Precast = require('Precast');
-	const NPC = require('NPC');
-	const GameData = require('GameData');
-	const Config = require('Config');
-	const Attack = require('Attack');
-	const Pickit = require('Pickit');
-	const Pather = require('Pather');
-	const Town = require('Town');
-	const Quests = require('QuestEvents');
+	this.checkQuest = function (id, state) {
+		sendPacket(1, 0x40);
+		delay(500);
 
-	const Questing = {
-
-		checkQuest: function (id, state) {
-			sendPacket(1, 0x40);
-			delay(500);
-
-			return me.getQuest(id, state);
-		},
-
-		DenOfEvil: function () {
-			const Den = require("../bots/Den");
-			if (!Quests.states[sdk.quests.DenOfEvil][1]) {
-				Den.clear();
-				Unit.resetIgnored();
-			}
-			if (Quests.states[sdk.quests.DenOfEvil][1] && !Quests.states[sdk.quests.DenOfEvil][0]) {
-				Den.talkToAkara();
-			}
-			return Quests.states[sdk.quests.DenOfEvil][0];
-		},
+		return me.getQuest(id, state);
+	};
 
 		/*SistersBurialGrounds: function () {
 

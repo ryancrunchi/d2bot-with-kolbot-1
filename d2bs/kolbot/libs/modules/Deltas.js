@@ -3,17 +3,20 @@
  * @description a basic implementation of delta's
  */
 (function (module, require) {
-	const Worker = require('Worker');
+	const Worker = require('../modules/Worker');
 	let instances = 0;
+
 
 	/** @constructor
 	 * @class Delta */
 	module.exports = function (trackers) {
 		let active = true;
 		this.values = (Array.isArray(trackers) && (Array.isArray(trackers.first()) && trackers || [trackers])) || [];
+		/** @methodOf Delta */
 		this.track = function (checkerFn, callback) {
 			return this.values.push({fn: checkerFn, callback: callback, value: checkerFn()});
 		};
+		/** @methodOf Delta */
 		this.check = function () {
 			this.values.some(delta => {
 				let val = delta.fn();

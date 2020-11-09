@@ -5,8 +5,8 @@
 
 
 (function (module, require) {
-	const myEvents = new (require('Events'));
-	const Worker = require('Worker');
+	const myEvents = new (require('../modules/Events'));
+	const Worker = require('../modules/Worker');
 
 
 	Worker.runInBackground.messaging = (new function () {
@@ -32,7 +32,15 @@
 		on: myEvents.on,
 		off: myEvents.off,
 		once: myEvents.once,
-		send: what => scriptBroadcast(what)
+		send: what => {
+			try {
+				// If we cant stringify it, d2bs cant either
+				JSON.stringify(what);
+				scriptBroadcast(what);
+			} catch (e) {
+				print(e.stack);
+			}
+		}
 	}
 
 })(module, require);

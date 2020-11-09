@@ -24,7 +24,7 @@
 	let NTIP = {},
 		CheckListInfo = [],
 		RuntimeCheckListInfo = [];
-	const Misc = require('Misc');
+	const Misc = require('../modules/Misc');
 
 	NTIP.CheckList = [];
 	NTIP.RuntimeCheckList = [];
@@ -421,6 +421,10 @@
                 		break;
             		case 'skin':
                 		p_result[0] += "item.skinCode";
+
+						break;
+					case 'distance':
+						p_result[0] += "(item.mode !== 3 && item.mode !== 5 && item.distance||0)";
 
 						break;
 					default:
